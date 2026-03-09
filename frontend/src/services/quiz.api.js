@@ -1,16 +1,5 @@
-import axios from "axios";
+import API from "./apiClient";
 
-const API = axios.create({
-  baseURL: "http://localhost:5000/api",
-});
-
-API.interceptors.request.use((req) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    req.headers.Authorization = `Bearer ${token}`;
-  }
-  return req;
-});
 
 /* =======================
    QUIZ APIs
@@ -23,5 +12,8 @@ export const submitQuizAttempt = (payload) =>
 
 export const getQuizReview = (pdfId) =>
   API.get(`/history/quiz/review/${pdfId}`);
+
+
+
 
 

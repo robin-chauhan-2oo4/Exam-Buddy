@@ -3,16 +3,10 @@ import {
   GraduationCap, Calendar, ChevronRight, FileText, 
   Trash2, Loader2, Search, CheckCircle2, HelpCircle, AlertTriangle 
 } from "lucide-react";
-import axios from "axios";
+import API from "../services/apiClient";
 import Layout from "../components/Layout.jsx";
 import { toast, ToastContainer } from "react-toastify";
 
-const API = axios.create({ baseURL: "http://localhost:5000/api" });
-API.interceptors.request.use((req) => {
-  const token = localStorage.getItem("token");
-  if (token) req.headers.Authorization = `Bearer ${token}`;
-  return req;
-});
 
 export default function QuizHistoryPage() {
   const [quizzes, setQuizzes] = useState([]);
@@ -221,3 +215,5 @@ function QuizCard({ quiz, onDelete }) {
     </details>
   );
 }
+
+

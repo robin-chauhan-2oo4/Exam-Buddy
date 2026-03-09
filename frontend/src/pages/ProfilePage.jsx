@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import API from "../services/apiClient";
 import { 
   User, Mail, Shield, LogOut, Activity, Zap, Loader2
 } from "lucide-react";
@@ -7,13 +7,6 @@ import Layout from "../components/Layout";
 import { getDashboardStats } from "../services/dashboard.api"; 
 
 // Configure API
-const API = axios.create({ baseURL: "http://localhost:5000/api" });
-
-API.interceptors.request.use((req) => {
-  const token = localStorage.getItem("token");
-  if (token) req.headers.Authorization = `Bearer ${token}`;
-  return req;
-});
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
@@ -188,3 +181,5 @@ function StatBox({ label, value }) {
     </div>
   );
 }
+
+

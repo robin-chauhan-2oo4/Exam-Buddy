@@ -154,3 +154,4 @@ function SidebarLink({ to, icon, label, isCollapsed }) {
     </NavLink>
   );
 }
+

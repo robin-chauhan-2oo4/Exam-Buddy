@@ -3,17 +3,11 @@ import {
   Send, Bot, User, Loader2, Sparkles, ShieldCheck, 
   History, Search, MessageSquare, Trash2, Plus, AlertTriangle 
 } from "lucide-react";
-import axios from "axios";
+import API from "../services/apiClient";
 import ReactMarkdown from "react-markdown";
 import Layout from "../components/Layout.jsx";
 import { toast, ToastContainer } from "react-toastify";
 
-const API = axios.create({ baseURL: "http://localhost:5000/api" });
-API.interceptors.request.use((req) => {
-  const token = localStorage.getItem("token");
-  if (token) req.headers.Authorization = `Bearer ${token}`;
-  return req;
-});
 
 export default function AMAPage() {
   const [messages, setMessages] = useState([
@@ -243,3 +237,5 @@ export default function AMAPage() {
     </Layout>
   );
 }
+
+

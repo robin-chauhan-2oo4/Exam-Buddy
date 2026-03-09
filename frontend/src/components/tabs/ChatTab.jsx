@@ -3,17 +3,11 @@ import {
   Send, Bot, User, Loader2, Sparkles, 
   History, MessageSquare, Trash2, ShieldCheck, Plus, Search, X, AlertTriangle 
 } from "lucide-react";
-import axios from "axios";
+import API from "../../services/apiClient";
 import ReactMarkdown from "react-markdown";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-const API = axios.create({ baseURL: "http://localhost:5000/api" });
-API.interceptors.request.use((req) => {
-  const token = localStorage.getItem("token");
-  if (token) req.headers.Authorization = `Bearer ${token}`;
-  return req;
-});
 
 export default function ChatTab({ pdfId }) {
   const [messages, setMessages] = useState([]);
@@ -273,3 +267,5 @@ export default function ChatTab({ pdfId }) {
     </div>
   );
 }
+
+

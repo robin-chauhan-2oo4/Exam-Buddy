@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom"; // 👈 Added useLocation
-import axios from "axios";
+import API from "../services/apiClient";
 import { 
   ArrowLeft, 
   FileText, 
@@ -19,15 +19,6 @@ import QuizTab from "../components/tabs/QuizTab";
 import ChatTab from "../components/tabs/ChatTab";
 
 // --- API Configuration ---
-const API = axios.create({
-  baseURL: "http://localhost:5000/api",
-});
-
-API.interceptors.request.use((req) => {
-  const token = localStorage.getItem("token");
-  if (token) req.headers.Authorization = `Bearer ${token}`;
-  return req;
-});
 
 export default function DocumentPage() {
   const { id } = useParams();
@@ -155,3 +146,5 @@ function ChatTabPlaceholder() {
     </div>
   );
 }
+
+

@@ -1,16 +1,5 @@
-import axios from "axios";
+import API from "./apiClient";
 
-const API = axios.create({
-  baseURL: "http://localhost:5000/api",
-});
-
-API.interceptors.request.use((req) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    req.headers.Authorization = `Bearer ${token}`;
-  }
-  return req;
-});
 
 export const uploadPDF = (file) => {
   const formData = new FormData();
@@ -30,4 +19,7 @@ export const getPDFById = (id) => {
 export const deletePDF = (id) => {
   return API.delete(`/pdf/${id}`);
 };
+
+
+
 
