@@ -8,7 +8,7 @@ import ReactMarkdown from "react-markdown";
 import Layout from "../components/Layout.jsx";
 import { toast, ToastContainer } from "react-toastify";
 
-const API = axios.create({ baseURL: "http://localhost:5000/api" });
+const API = axios.create({ baseURL: "https://exam-buddy-a88x.onrender.com/api" });
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
   if (token) req.headers.Authorization = `Bearer ${token}`;
