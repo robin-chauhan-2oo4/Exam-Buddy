@@ -20,7 +20,7 @@ import ChatTab from "../components/tabs/ChatTab";
 
 // --- API Configuration ---
 const API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: "https://exam-buddy-a88x.onrender.com/api",
 });
 
 API.interceptors.request.use((req) => {
