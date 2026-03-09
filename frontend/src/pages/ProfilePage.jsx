@@ -7,7 +7,7 @@ import Layout from "../components/Layout";
 import { getDashboardStats } from "../services/dashboard.api"; 
 
 // Configure API
-const API = axios.create({ baseURL: "http://localhost:5000/api" });
+const API = axios.create({ baseURL: "https://exam-buddy-a88x.onrender.com/api" });
 
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
