@@ -2,14 +2,124 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   THEME CSS VARIABLES
+   ============================================ */
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --transition-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Dark Theme (Default) */
+[data-theme='dark'] {
+  --bg-primary: #0a0a1a;
+  --bg-secondary: #111127;
+  --bg-card: #16163a;
+  --bg-card-hover: #1e1e4a;
+  --bg-surface: #0f0f2e;
+  --bg-input: #1a1a40;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-color: #2a2a5a;
+  --border-light: #1e1e4a;
+  --accent: #6366f1;
+  --accent-light: rgba(99, 102, 241, 0.15);
+  --accent-shadow: rgba(99, 102, 241, 0.25);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --spotlight-color: rgba(99, 102, 241, 0.12);
+  --spotlight-border: rgba(99, 102, 241, 0.4);
+  --spotlight-shadow: rgba(99, 102, 241, 0.15);
+  --scrollbar-thumb: #334155;
+  --scrollbar-hover: #475569;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-border: rgba(239, 68, 68, 0.2);
+  --danger-text: #f87171;
+  --success-bg: rgba(34, 197, 94, 0.1);
+  --success-text: #4ade80;
+  --glow-strength: 0.25;
+  --orb-opacity: 1;
+  --ambient-multiplier: 1;
+  --input-focus-glow: 0 0 0 3px rgba(99, 102, 241, 0.15), 0 0 20px rgba(99, 102, 241, 0.1);
+  --card-hover-glow: 0 8px 32px rgba(99, 102, 241, 0.12);
+  --btn-shine-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Light Theme — boosted animations & contrast */
+[data-theme='light'] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-input: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+  --accent: #6366f1;
+  --accent-light: rgba(99, 102, 241, 0.08);
+  --accent-shadow: rgba(99, 102, 241, 0.18);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --spotlight-color: rgba(99, 102, 241, 0.1);
+  --spotlight-border: rgba(99, 102, 241, 0.35);
+  --spotlight-shadow: rgba(99, 102, 241, 0.1);
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-hover: #94a3b8;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-text: #ef4444;
+  --success-bg: #f0fdf4;
+  --success-text: #16a34a;
+  --glow-strength: 0.35;
+  --orb-opacity: 1;
+  --ambient-multiplier: 1.6;
+  --input-focus-glow: 0 0 0 3px rgba(99, 102, 241, 0.12), 0 0 20px rgba(99, 102, 241, 0.06);
+  --card-hover-glow: 0 8px 32px rgba(99, 102, 241, 0.08);
+  --btn-shine-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ============================================
+   SMOOTH THEME TRANSITIONS
+   Scoped to specific properties — no global * !
+   ============================================ */
+body,
+header,
+aside,
+main,
+.card-spotlight,
+nav {
+  transition: background-color 0.4s var(--transition-smooth),
+              color 0.35s var(--transition-smooth),
+              border-color 0.35s var(--transition-smooth),
+              box-shadow 0.35s var(--transition-smooth);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
 @layer base {
   body {
-    /* CHANGED: Use slate-50 (light gray) instead of slate-950 */
-    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+    font-family: var(--font-sans);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Smooth text rendering for animations */
+  * {
+    -webkit-backface-visibility: hidden;
+    -moz-backface-visibility: hidden;
   }
 }
 
-/* Custom Scrollbar for the main content area */
+/* ============================================
+   SCROLLBAR — refined with transitions
+   ============================================ */
 @layer utilities {
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
@@ -19,36 +129,494 @@
     background: transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 rounded-full hover:bg-slate-400;
+    background: var(--scrollbar-thumb);
+    border-radius: 999px;
+    transition: background 0.2s ease;
   }
-  
-  .animate-fade-in {
-    animation: fadeIn 0.5s ease-out forwards;
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
   }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
-/* src/index.css */
+/* ============================================
+   CORE KEYFRAMES (GPU-only: transform + opacity)
+   ============================================ */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
 
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0) translateZ(0); }
+  50% { transform: translateY(-8px) translateZ(0); }
+}
+
+@keyframes drift-slow {
+  0%, 100% { transform: translate(0, 0) translateZ(0); opacity: 0.15; }
+  33% { transform: translate(20px, -25px) translateZ(0); opacity: 0.2; }
+  66% { transform: translate(-15px, 15px) translateZ(0); opacity: 0.12; }
+}
+
+@keyframes drift-slow-light {
+  0%, 100% { transform: translate(0, 0) scale(1) translateZ(0); }
+  33% { transform: translate(30px, -35px) scale(1.05) translateZ(0); }
+  66% { transform: translate(-20px, 20px) scale(0.95) translateZ(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.22; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%) translateZ(0); }
+  100% { transform: translateX(100%) translateZ(0); }
+}
+
+@keyframes glow-breathe {
+  0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.1); }
+  50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.2); }
+}
+
+@keyframes slide-up-fade {
+  0% { opacity: 0; transform: translateY(16px) translateZ(0); }
+  100% { opacity: 1; transform: translateY(0) translateZ(0); }
+}
+
+@keyframes slide-down-fade {
+  0% { opacity: 0; transform: translateY(-16px) translateZ(0); }
+  100% { opacity: 1; transform: translateY(0) translateZ(0); }
+}
+
+@keyframes scale-in {
+  0% { opacity: 0; transform: scale(0.9) translateZ(0); }
+  100% { opacity: 1; transform: scale(1) translateZ(0); }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0); opacity: 0.5; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+@keyframes float-rotate {
+  0%, 100% { transform: translateY(0) rotate(0deg) translateZ(0); }
+  25% { transform: translateY(-6px) rotate(1deg) translateZ(0); }
+  50% { transform: translateY(-10px) rotate(0deg) translateZ(0); }
+  75% { transform: translateY(-6px) rotate(-1deg) translateZ(0); }
+}
+
+@keyframes type-in {
+  0% { width: 0; }
+  100% { width: 100%; }
+}
+
+@keyframes dot-bounce {
+  0%, 80%, 100% { transform: scale(0) translateZ(0); }
+  40% { transform: scale(1) translateZ(0); }
+}
+
+@keyframes border-glow {
+  0%, 100% { border-color: rgba(99, 102, 241, 0.2); }
+  50% { border-color: rgba(99, 102, 241, 0.5); }
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.animate-gradient {
+  animation: gradient-shift 4s ease-in-out infinite;
+  background-size: 200% 200%;
+}
+
+.animate-slide-up {
+  animation: slide-up-fade 0.5s var(--transition-spring) both;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.4s var(--transition-spring) both;
+}
+
+.animate-glow-breathe {
+  animation: glow-breathe 3s ease-in-out infinite;
+}
+
+.animate-float-rotate {
+  animation: float-rotate 5s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease both;
+}
+
+/* ============================================
+   STAGGERED ANIMATION UTILITY
+   ============================================ */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* ============================================
+   3D FLASHCARD UTILITIES
+   ============================================ */
 @layer utilities {
-  .perspective-1000 {
-    perspective: 1000px;
-  }
-  .transform-style-3d {
-    transform-style: preserve-3d;
-  }
-  .backface-hidden {
-    backface-visibility: hidden;
-  }
-  /* Fix for Safari/iOS flickering */
-  .rotate-y-180 {
-    transform: rotateY(180deg);
-  }
+  .perspective-1000 { perspective: 1000px; }
+  .transform-style-3d { transform-style: preserve-3d; }
+  .backface-hidden { backface-visibility: hidden; }
+  .rotate-y-180 { transform: rotateY(180deg); }
 }
 
-.animate-fade-in { animation: fadeIn 0.5s ease-out; }
- @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0);}}
+/* ============================================
+   AUTH PAGE BACKGROUNDS — BOOSTED FOR BOTH THEMES
+   ============================================ */
+.auth-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.auth-bg .orb {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+  animation: drift-slow 18s ease-in-out infinite;
+  opacity: var(--orb-opacity);
+}
+
+/* Dark theme orbs (default — subtle glows) */
+.auth-bg .orb-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%);
+  top: -15%;
+  left: -10%;
+  animation-duration: 20s;
+}
+
+.auth-bg .orb-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(6,182,212,0.15) 0%, transparent 70%);
+  bottom: -15%;
+  right: -10%;
+  animation-delay: -6s;
+  animation-duration: 16s;
+}
+
+.auth-bg .orb-3 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%);
+  top: 40%;
+  left: 40%;
+  animation-delay: -3s;
+  animation-duration: 22s;
+}
+
+/* Light theme orbs — MUCH STRONGER gradients for visibility */
+[data-theme='light'] .auth-bg .orb {
+  animation-name: drift-slow-light;
+}
+
+[data-theme='light'] .auth-bg .orb-1 {
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle,
+    rgba(99, 102, 241, 0.15) 0%,
+    rgba(139, 92, 246, 0.08) 40%,
+    transparent 70%);
+}
+
+[data-theme='light'] .auth-bg .orb-2 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle,
+    rgba(6, 182, 212, 0.12) 0%,
+    rgba(20, 184, 166, 0.06) 40%,
+    transparent 70%);
+}
+
+[data-theme='light'] .auth-bg .orb-3 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle,
+    rgba(168, 85, 247, 0.12) 0%,
+    rgba(236, 72, 153, 0.06) 40%,
+    transparent 70%);
+}
+
+.auth-grid {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: fade-in 1.5s ease both;
+}
+
+[data-theme='light'] .auth-grid {
+  background-image:
+    linear-gradient(to right, rgba(99, 102, 241, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.06) 1px, transparent 1px);
+}
+
+/* ============================================
+   DASHBOARD AMBIENT — BOOSTED FOR BOTH THEMES
+   ============================================ */
+.dashboard-ambient {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.dashboard-ambient .ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform, opacity;
+  animation: drift-slow 25s ease-in-out infinite;
+}
+
+.dashboard-ambient .ambient-orb-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 65%);
+  top: -20%;
+  right: -15%;
+}
+
+.dashboard-ambient .ambient-orb-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 65%);
+  bottom: -20%;
+  left: -15%;
+  animation-delay: -9s;
+}
+
+.dashboard-ambient .ambient-orb-3 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(6,182,212,0.04) 0%, transparent 65%);
+  top: 35%;
+  left: 25%;
+  animation-delay: -17s;
+}
+
+/* Light theme ambient orbs — stronger for visibility on white */
+[data-theme='light'] .dashboard-ambient .ambient-orb {
+  animation-name: drift-slow-light;
+}
+
+[data-theme='light'] .dashboard-ambient .ambient-orb-1 {
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle,
+    rgba(99, 102, 241, 0.08) 0%,
+    rgba(139, 92, 246, 0.04) 40%,
+    transparent 65%);
+}
+
+[data-theme='light'] .dashboard-ambient .ambient-orb-2 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle,
+    rgba(139, 92, 246, 0.07) 0%,
+    rgba(168, 85, 247, 0.03) 40%,
+    transparent 65%);
+}
+
+[data-theme='light'] .dashboard-ambient .ambient-orb-3 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle,
+    rgba(6, 182, 212, 0.06) 0%,
+    rgba(20, 184, 166, 0.03) 40%,
+    transparent 65%);
+}
+
+/* ============================================
+   INPUT FOCUS EFFECTS — glow ring
+   ============================================ */
+input:focus,
+textarea:focus {
+  box-shadow: var(--input-focus-glow) !important;
+  border-color: var(--accent) !important;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* ============================================
+   BUTTON SHINE EFFECT
+   ============================================ */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    var(--btn-shine-color) 45%,
+    var(--btn-shine-color) 55%,
+    transparent 60%
+  );
+  transform: translateX(-200%);
+  transition: none;
+}
+
+.btn-shine:hover::after {
+  animation: shimmer 0.8s ease-in-out;
+}
+
+/* ============================================
+   LOADING DOTS
+   ============================================ */
+.loading-dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.loading-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dot-bounce 1.4s ease-in-out infinite both;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+.loading-dots span:nth-child(3) { animation-delay: 0s; }
+
+/* ============================================
+   NOTIFICATION BADGE PULSE
+   ============================================ */
+.notification-dot {
+  position: relative;
+}
+
+.notification-dot::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse-soft 2s ease-in-out infinite;
+  z-index: -1;
+}
+
+/* ============================================
+   SELECTION + PLACEHOLDER + FOCUS
+   ============================================ */
+::selection {
+  background-color: rgba(99, 102, 241, 0.3);
+  color: var(--text-primary);
+}
+
+::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ============================================
+   PROSE THEME OVERRIDE (for markdown)
+   ============================================ */
+.prose h1, .prose h2, .prose h3, .prose h4 { color: var(--text-primary) !important; }
+.prose p, .prose li, .prose td { color: var(--text-secondary) !important; }
+.prose strong { color: var(--text-primary) !important; }
+.prose a { color: var(--accent) !important; }
+.prose code {
+  color: var(--accent) !important;
+  background: var(--bg-input) !important;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.prose pre {
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
+}
+.prose blockquote {
+  border-left-color: var(--accent) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* ============================================
+   SKELETON LOADING ANIMATION
+   ============================================ */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-input) 25%,
+    var(--bg-card-hover) 50%,
+    var(--bg-input) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* ============================================
+   SMOOTH PAGE TRANSITION WRAPPER
+   ============================================ */
+.page-enter {
+  animation: slide-up-fade 0.5s var(--transition-spring) both;
+}
+
+.page-exit {
+  animation: slide-down-fade 0.3s ease both reverse;
+}
+
+/* ============================================
+   HOVER LIFT UTILITY — adds shadow + translate
+   ============================================ */
+.hover-lift {
+  transition: transform 0.3s var(--transition-spring),
+              box-shadow 0.3s var(--transition-smooth);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px) translateZ(0);
+  box-shadow: var(--card-hover-glow);
+}
+
+/* ============================================
+   GLASS MORPHISM UTILITY
+   ============================================ */
+.glass {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
+[data-theme='dark'] .glass {
+  background: rgba(22, 22, 58, 0.8);
+  border: 1px solid rgba(42, 42, 90, 0.6);
+}
+
+[data-theme='light'] .glass {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}

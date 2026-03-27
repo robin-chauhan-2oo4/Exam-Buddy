@@ -547,7 +547,7 @@ ${text}
 
 export const chatWithPDF = async (req, res) => {
   try {
-    const { pdfId, question } = req.body;
+    const { pdfId, question, sessionId } = req.body;
     const pdf = await PDF.findById(pdfId);
     if (!pdf) return res.status(404).json({ message: "PDF not found" });
 
@@ -555,7 +555,10 @@ export const chatWithPDF = async (req, res) => {
 
     const response = await generateSmart(
       question,
-      `Answer strictly using this document:\n${context}`,
+      `You are a helpful and intelligent study assistant. Use the following document extract as context for the user's questions, but feel free to use your own general knowledge to fully answer and elaborate if the document is missing details.
+      
+      [DOCUMENT CONTEXT]:
+      ${context}`,
     );
 
     const answer = getText(response);
@@ -564,6 +567,7 @@ export const chatWithPDF = async (req, res) => {
       user: req.user.id,
       pdf: pdfId,
       type: "chat",
+      sessionId: sessionId || null,
       input: question,
       output: answer,
     });
@@ -581,7 +585,7 @@ export const chatWithPDF = async (req, res) => {
 
 export const askAnything = async (req, res) => {
   try {
-    const { question } = req.body;
+    const { question, sessionId } = req.body;
 
     const response = await generateSmart(
       question,
@@ -593,6 +597,7 @@ export const askAnything = async (req, res) => {
     await AIHistory.create({
       user: req.user.id,
       type: "ama",
+      sessionId: sessionId || null,
       input: question,
       output: answer,
     });
@@ -644,13 +649,12 @@ export const deleteChatHistory = async (req, res) => {
       return res.status(400).json({ message: "History ID is required" });
     }
 
-    const deleted = await AIHistory.findOneAndDelete({
-      _id: historyId,
+    const deleted = await AIHistory.deleteMany({
+      $or: [{ _id: historyId }, { sessionId: historyId }],
       user: req.user.id,
-      type: "chat", // ✅ ensure only chat records are deleted
     });
 
-    if (!deleted) {
+    if (!deleted.deletedCount) {
       return res.status(404).json({
         message: "Chat history not found or not authorized",
       });

@@ -1,27 +1,47 @@
 import { useState, useRef, useEffect } from "react";
-import { 
-  Send, Bot, User, Loader2, Sparkles, 
-  History, MessageSquare, Trash2, ShieldCheck, Plus, Search, X, AlertTriangle 
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Send, Bot, User, Loader2, Sparkles,
+  History, MessageSquare, Trash2, ShieldCheck, Plus, Search, AlertTriangle, X, PanelLeftOpen,
 } from "lucide-react";
 import API from "../../services/apiClient";
 import ReactMarkdown from "react-markdown";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-
+import { toast } from "react-toastify";
 
 export default function ChatTab({ pdfId }) {
   const [messages, setMessages] = useState([]);
-  const [chatHistory, setChatHistory] = useState([]); 
+  const [chatHistory, setChatHistory] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetchingHistory, setFetchingHistory] = useState(true);
-  
-  // ✅ MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
-  
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState(null);
   const scrollRef = useRef(null);
+
+  const groupSessions = (historyList) => {
+    const map = new Map();
+    historyList.forEach((item) => {
+      const sid = item.sessionId || item._id;
+      if (!map.has(sid)) {
+        map.set(sid, {
+          _id: sid,
+          title: item.input, 
+          createdAt: item.createdAt,
+          messages: [],
+        });
+      }
+      map.get(sid).messages.unshift({ role: "user", text: item.input });
+      map.get(sid).messages.unshift({ role: "ai", text: item.output });
+    });
+    
+    return Array.from(map.values()).map(sess => ({
+      ...sess,
+      title: sess.messages.find(m => m.role === "user")?.text || "Chat Session"
+    }));
+  };
 
   useEffect(() => {
     const loadFullHistory = async () => {
@@ -29,16 +49,18 @@ export default function ChatTab({ pdfId }) {
         setFetchingHistory(true);
         const res = await API.get(`/ai/history/${pdfId}`);
         const chatSessions = res.data.history || [];
-        
+
         if (chatSessions.length > 0) {
-          const formatted = chatSessions.flatMap(h => [
-            { role: "user", text: h.input },
-            { role: "ai", text: h.output }
-          ]);
-          setMessages(formatted);
-          setChatHistory([...chatSessions].reverse()); 
+          const grouped = groupSessions(chatSessions);
+          setChatHistory(grouped);
+          
+          if (grouped.length > 0) {
+            setMessages(grouped[0].messages);
+            setActiveSessionId(grouped[0]._id);
+          }
         } else {
           setMessages([{ role: "ai", text: "Hi! How can I help you with this PDF today?" }]);
+          setActiveSessionId(null);
         }
       } catch (error) {
         console.error("Frontend History Error:", error);
@@ -59,7 +81,7 @@ export default function ChatTab({ pdfId }) {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const yesterday = today - 86400000;
 
-    history.forEach(item => {
+    history.forEach((item) => {
       const itemDate = new Date(item.createdAt).getTime();
       if (itemDate >= today) groups.Today.push(item);
       else if (itemDate >= yesterday) groups.Yesterday.push(item);
@@ -69,25 +91,33 @@ export default function ChatTab({ pdfId }) {
   };
 
   const handleSelectHistory = (item) => {
-    setMessages([{ role: "user", text: item.input }, { role: "ai", text: item.output }]);
+    setMessages(item.messages);
+    setActiveSessionId(item._id);
+    setHistoryOpen(false);
+  };
+  
+  const handleNewSession = () => {
+    setMessages([{ role: "ai", text: "New session started." }]);
+    setActiveSessionId(Date.now().toString());
   };
 
-  // ✅ TRIGGER MODAL
   const openDeleteModal = (e, historyId) => {
     e.stopPropagation();
     setItemToDelete(historyId);
     setIsModalOpen(true);
   };
 
-  // ✅ EXECUTE DELETE
   const confirmDelete = async () => {
     if (!itemToDelete) return;
     setIsModalOpen(false);
     const statusId = toast.loading("Removing chat...");
     try {
       await API.delete(`/ai/history/${itemToDelete}`);
-      setChatHistory(prev => prev.filter(item => item._id !== itemToDelete));
+      setChatHistory((prev) => prev.filter((item) => item._id !== itemToDelete));
       toast.update(statusId, { render: "Deleted successfully", type: "success", isLoading: false, autoClose: 2000 });
+      if (activeSessionId === itemToDelete) {
+        handleNewSession();
+      }
     } catch (error) {
       toast.update(statusId, { render: "Failed to delete record", type: "error", isLoading: false, autoClose: 2000 });
     } finally {
@@ -99,13 +129,35 @@ export default function ChatTab({ pdfId }) {
     e.preventDefault();
     if (!input.trim() || loading) return;
     const userMessage = input.trim();
-    setInput(""); 
+    setInput("");
     setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
     setLoading(true);
     try {
-      const res = await API.post("/ai/chat", { pdfId, question: userMessage });
+      let currentSessionId = activeSessionId;
+      if (!currentSessionId) {
+        currentSessionId = Date.now().toString();
+        setActiveSessionId(currentSessionId);
+      }
+      
+      const res = await API.post("/ai/chat", { pdfId, question: userMessage, sessionId: currentSessionId });
       setMessages((prev) => [...prev, { role: "ai", text: res.data.answer }]);
-      setChatHistory(prev => [{ _id: Date.now().toString(), input: userMessage, output: res.data.answer, createdAt: new Date() }, ...prev]);
+      
+      setChatHistory((prev) => {
+        const existingIdx = prev.findIndex(p => p._id === currentSessionId);
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          const sess = updated[existingIdx];
+          sess.messages = [...sess.messages, { role: "user", text: userMessage }, { role: "ai", text: res.data.answer }];
+          return updated;
+        } else {
+          return [{
+            _id: currentSessionId,
+            title: userMessage,
+            createdAt: new Date(),
+            messages: [{ role: "user", text: userMessage }, { role: "ai", text: res.data.answer }]
+          }, ...prev];
+        }
+      });
     } catch (error) {
       toast.error("Failed to connect to AI");
     } finally {
@@ -113,159 +165,320 @@ export default function ChatTab({ pdfId }) {
     }
   };
 
-  const filteredHistory = chatHistory.filter(item => 
-    item.input.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredHistory = chatHistory.filter((item) =>
+    item.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="flex h-[calc(100vh-220px)] w-full bg-white border border-slate-200 shadow-sm overflow-hidden rounded-2xl relative">
-      <ToastContainer limit={1} />
-
-      {/* 🔴 DELETE MODAL OVERLAY */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Backdrop Blur */}
-          <div 
-            className="absolute inset-0 bg-white/30 animate-in fade-in duration-300"
-            onClick={() => setIsModalOpen(false)}
-          />
-          
-          {/* Modal Content */}
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
-            <div className="p-6 text-center">
-              <div className="mx-auto w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Chat Record?</h3>
-              <p className="text-sm text-slate-500 mb-6">
-                This action cannot be undone. This question will be permanently removed from your history.
-              </p>
-              
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="flex h-[calc(100vh-240px)] sm:h-[calc(100vh-260px)] w-full overflow-hidden rounded-2xl relative"
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}
+    >
+      {/* Delete Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 backdrop-blur-sm" style={{ background: 'rgba(0,0,0,0.4)' }}
+              onClick={() => setIsModalOpen(false)}
+            />
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+              className="relative rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}
+            >
+              <div className="p-6 text-center">
+                <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4"
+                  style={{ background: 'var(--danger-bg)', color: 'var(--danger-text)' }}
                 >
-                  Cancel
-                </button>
-                <button 
-                  onClick={confirmDelete}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 shadow-lg shadow-red-100 transition-all active:scale-95"
-                >
-                  Delete
-                </button>
+                  <AlertTriangle size={24} />
+                </div>
+                <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Delete Chat Record?</h3>
+                <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+                  This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setIsModalOpen(false)}
+                    className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold"
+                    style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
+                  >Cancel</button>
+                  <button onClick={confirmDelete}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 shadow-lg active:scale-95"
+                  >Delete</button>
+                </div>
               </div>
-            </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      {/* --- Sidebar --- */}
-      <div className="w-72 border-r border-slate-100 bg-slate-50/50 flex flex-col shrink-0">
-        <div className="p-5 border-b border-slate-100 bg-white">
+      {/* Desktop Sidebar */}
+      <div className="hidden md:flex w-72 flex-col shrink-0"
+        style={{ borderRight: '1px solid var(--border-light)', background: 'var(--bg-surface)' }}
+      >
+        <div className="p-4 shrink-0" style={{ borderBottom: '1px solid var(--border-light)' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Chat History</h3>
-            <button onClick={() => setMessages([{ role: "ai", text: "New session started." }])} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg">
-              <Plus size={18}/>
-            </button>
+            <h3 className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+              Chat History
+            </h3>
+            <motion.button
+              whileHover={{ scale: 1.1, rotate: 90 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleNewSession}
+              className="p-1.5 rounded-lg" style={{ color: 'var(--accent)' }}
+            >
+              <Plus size={18} />
+            </motion.button>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-            <input 
-              type="text" 
-              placeholder="Search..." 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-              className="w-full pl-9 pr-3 py-2 bg-slate-100 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-100 transition-all" 
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={14} style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text" placeholder="Search..." value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl text-xs outline-none focus:ring-2 transition-all"
+              style={{
+                background: 'var(--bg-input)', border: '1px solid transparent',
+                color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-light)',
+              }}
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-5 custom-scrollbar">
-          {Object.entries(groupHistoryByDate(filteredHistory)).map(([label, items]) => (
-            items.length > 0 && (
-              <div key={label}>
-                <h4 className="px-3 mb-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</h4>
-                <div className="space-y-1">
-                  {items.map((item) => (
-                    <div key={item._id} className="group relative">
-                      <button 
-                        onClick={() => handleSelectHistory(item)} 
-                        className="w-full text-left p-3 rounded-xl hover:bg-white hover:shadow-sm transition-all"
-                      >
-                        <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed font-medium">{item.input}</p>
-                      </button>
-                      <button 
-                        onClick={(e) => openDeleteModal(e, item._id)} 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <Trash2 size={14}/>
-                      </button>
-                    </div>
-                  ))}
+          {fetchingHistory ? (
+            <div className="flex justify-center pt-10">
+              <Loader2 size={16} className="animate-spin" style={{ color: 'var(--accent)' }} />
+            </div>
+          ) : (
+            Object.entries(groupHistoryByDate(filteredHistory)).map(([label, items]) =>
+              items.length > 0 && (
+                <div key={label}>
+                  <h4 className="px-3 mb-3 text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                    {label}
+                  </h4>
+                  <div className="space-y-1">
+                    {items.map((item) => (
+                      <div key={item._id} className="group relative">
+                        <button
+                          onClick={() => handleSelectHistory(item)}
+                          className="w-full text-left p-3 rounded-xl transition-all border border-transparent"
+                          style={{ color: 'var(--text-primary)' }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--bg-card)';
+                            e.currentTarget.style.borderColor = 'var(--border-color)';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.borderColor = 'transparent';
+                          }}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <MessageSquare size={12} style={{ color: 'var(--accent)' }} />
+                            <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
+                              {new Date(item.createdAt).toLocaleDateString()} • {item.messages.length} msgs
+                            </span>
+                          </div>
+                          <p className="text-[11px] line-clamp-2 leading-snug" style={{ color: 'var(--text-secondary)' }}>
+                            {item.title}
+                          </p>
+                        </button>
+                        <button
+                          onClick={(e) => openDeleteModal(e, item._id)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 opacity-0 group-hover:opacity-100 transition-all"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )
             )
-          ))}
+          )}
         </div>
       </div>
 
-      {/* --- Main Chat Section --- */}
-      <div className="flex-1 flex flex-col bg-white">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md">
+      {/* Mobile History Overlay */}
+      <AnimatePresence>
+        {historyOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[80] md:hidden backdrop-blur-sm"
+              style={{ background: 'rgba(0,0,0,0.4)' }}
+              onClick={() => setHistoryOpen(false)}
+            />
+            <motion.div
+              initial={{ x: -300 }}
+              animate={{ x: 0 }}
+              exit={{ x: -300 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed left-0 top-0 bottom-0 w-72 z-[90] md:hidden flex flex-col"
+              style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border-color)' }}
+            >
+              <div className="flex items-center justify-between px-4 py-3 shrink-0"
+                style={{ borderBottom: '1px solid var(--border-light)' }}
+              >
+                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Chat History</span>
+                <button onClick={() => setHistoryOpen(false)} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                {chatHistory.map((item) => (
+                  <button
+                    key={item._id}
+                    onClick={() => handleSelectHistory(item)}
+                    className="w-full text-left p-3 rounded-xl"
+                    style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)' }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <MessageSquare size={12} style={{ color: 'var(--accent)' }} />
+                      <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
+                        {new Date(item.createdAt).toLocaleDateString()} • {item.messages.length} msgs
+                      </span>
+                    </div>
+                    <p className="text-[11px] line-clamp-2 leading-snug" style={{ color: 'var(--text-secondary)' }}>
+                      {item.title}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Main Chat */}
+      <div className="flex-1 flex flex-col min-w-0" style={{ background: 'var(--bg-card)' }}>
+        <div className="px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0"
+          style={{ borderBottom: '1px solid var(--border-light)' }}
+        >
           <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-2 rounded-xl text-white shadow-lg"><Bot size={18}/></div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 tracking-tight">Study Assistant</h3>
-              <p className="text-[10px] text-emerald-600 font-bold uppercase flex items-center gap-1"><ShieldCheck size={10} /> Grounded</p>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setHistoryOpen(true)}
+              className="p-2 rounded-lg md:hidden"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <PanelLeftOpen size={20} />
+            </motion.button>
+
+            <motion.div
+              whileHover={{ scale: 1.1, rotate: 10 }}
+              className="p-2 rounded-xl text-white shadow-lg shrink-0"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+            >
+              <Bot size={18} className="sm:w-5 sm:h-5" />
+            </motion.div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-black tracking-tight truncate" style={{ color: 'var(--text-primary)' }}>
+                Study Assistant
+              </h3>
+              <p className="text-[10px] font-bold uppercase tracking-widest items-center gap-1 hidden sm:flex"
+                style={{ color: 'var(--success-text)' }}
+              >
+                <ShieldCheck size={10} /> Document-Grounded
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 bg-slate-50/20">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 custom-scrollbar" style={{ background: 'var(--bg-surface)' }}>
           {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`flex gap-4 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${msg.role === "user" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-blue-600"}`}>
-                  {msg.role === "user" ? <User size={14}/> : <Sparkles size={14}/>}
-                </div>
-                <div className={`px-5 py-3 rounded-2xl text-[14px] leading-relaxed shadow-sm ${msg.role === "user" ? "bg-blue-600 text-white rounded-tr-none shadow-blue-100" : "bg-white border border-slate-100 text-slate-800 rounded-tl-none"}`}>
-                  <ReactMarkdown components={{ p: ({node, ...props}) => <p {...props} className="mb-0 font-medium" /> }}>{msg.text}</ReactMarkdown>
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 12, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay: Math.min(i * 0.03, 0.3) }}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <div className={`flex gap-2 sm:gap-3 max-w-[92%] sm:max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 mt-1 shadow-sm"
+                  style={{
+                    background: msg.role === "user" ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'var(--bg-card)',
+                    border: msg.role === "user" ? 'none' : '1px solid var(--border-color)',
+                    color: msg.role === "user" ? '#fff' : 'var(--accent)',
+                  }}
+                >
+                  {msg.role === "user" ? <User size={14} /> : <Sparkles size={14} />}
+                </motion.div>
+                <div
+                  className="px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-[13px] sm:text-[14px] leading-relaxed shadow-sm"
+                  style={{
+                    background: msg.role === "user" ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'var(--bg-card)',
+                    color: msg.role === "user" ? '#fff' : 'var(--text-primary)',
+                    border: msg.role === "user" ? 'none' : '1px solid var(--border-light)',
+                    borderTopRightRadius: msg.role === "user" ? 0 : undefined,
+                    borderTopLeftRadius: msg.role !== "user" ? 0 : undefined,
+                  }}
+                >
+                  <ReactMarkdown
+                    components={{
+                      p: ({ node, ...props }) => <p {...props} className="mb-0 font-medium" />,
+                    }}
+                  >
+                    {msg.text}
+                  </ReactMarkdown>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
           {loading && (
-            <div className="flex gap-3 items-center bg-white border border-slate-100 w-fit px-5 py-3 rounded-2xl shadow-sm">
-              <Loader2 size={14} className="animate-spin text-blue-600"/>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Thinking...</span>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="flex gap-3 items-center w-fit px-4 sm:px-5 py-3 rounded-2xl rounded-tl-none shadow-sm"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
+            >
+              <div className="loading-dots">
+                <span /><span /><span />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                Thinking...
+              </span>
+            </motion.div>
           )}
           <div ref={scrollRef} />
         </div>
 
-        <div className="p-6 bg-white border-t border-slate-100">
-          <form onSubmit={handleSend} className="max-w-4xl mx-auto flex items-center gap-3 bg-slate-100 rounded-2xl p-1.5 border border-slate-200 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-50 transition-all shadow-sm">
-            <input 
-              type="text" 
-              value={input} 
-              onChange={(e) => setInput(e.target.value)} 
-              placeholder="Ask a question..." 
-              className="flex-1 bg-transparent px-4 py-2.5 text-sm outline-none font-semibold" 
-              disabled={loading} 
+        <div className="p-3 sm:p-4 md:p-6 shrink-0" style={{ borderTop: '1px solid var(--border-light)', background: 'var(--bg-card)' }}>
+          <form
+            onSubmit={handleSend}
+            className="max-w-4xl mx-auto flex items-center gap-2 rounded-2xl p-1.5 transition-all shadow-sm"
+            style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)' }}
+          >
+            <input
+              type="text" value={input} onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about this document..."
+              className="flex-1 bg-transparent px-3 sm:px-4 py-2 sm:py-2.5 text-sm outline-none font-semibold min-w-0"
+              style={{ color: 'var(--text-primary)' }} disabled={loading}
             />
-            <button 
-              type="submit" 
-              disabled={!input.trim() || loading} 
-              className={`p-3 rounded-xl transition-all ${!input.trim() || loading ? "text-slate-300" : "bg-blue-600 text-white shadow-lg shadow-blue-200 hover:scale-105 active:scale-95"}`}
+            <motion.button
+              type="submit" disabled={!input.trim() || loading}
+              whileHover={input.trim() ? { scale: 1.08, rotate: -5 } : {}}
+              whileTap={input.trim() ? { scale: 0.92 } : {}}
+              className="p-2 sm:p-2.5 rounded-xl disabled:opacity-50 shrink-0"
+              style={{
+                background: !input.trim() || loading ? 'transparent' : 'var(--accent)',
+                color: !input.trim() || loading ? 'var(--text-muted)' : '#fff',
+                boxShadow: !input.trim() || loading ? 'none' : '0 4px 16px var(--accent-shadow)',
+                transition: 'background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease',
+              }}
             >
-              <Send size={18}/>
-            </button>
+              <Send size={18} />
+            </motion.button>
           </form>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
-
-

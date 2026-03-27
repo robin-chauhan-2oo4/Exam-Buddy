@@ -24,6 +24,10 @@ const AIHistorySchema = new mongoose.Schema(
       ],
       required: true,
     },
+    sessionId: {
+      type: String,
+      required: false, // Used for grouping chat/AMA messages into threads
+    },
     input: String,
     output: mongoose.Schema.Types.Mixed,
   },

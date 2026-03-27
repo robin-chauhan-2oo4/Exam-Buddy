@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Play,
   Clock,
@@ -8,22 +9,21 @@ import {
   RotateCcw,
   FileText,
   Trophy,
+  Loader2,
+  Zap,
 } from "lucide-react";
 import {
   generateQuiz,
   submitQuizAttempt,
   getQuizReview,
 } from "../../services/quiz.api";
+import SpotlightCard from "../reactbits/SpotlightCard";
 
 const QUESTION_TIME = 60;
 
-// ✅ FIXED: Aggressive Normalizer
-// Removes spaces, punctuation, symbols, and case sensitivity for comparison.
 const normalize = (str) => {
   if (!str) return "";
-  return String(str)
-    .replace(/[^a-zA-Z0-9]/g, "") // Remove EVERYTHING except letters & numbers
-    .toLowerCase(); // Ignore case
+  return String(str).replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 };
 
 export default function QuizTab({ pdfId }) {
@@ -33,79 +33,45 @@ export default function QuizTab({ pdfId }) {
   const [answers, setAnswers] = useState([]);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIME);
-  const [mode, setMode] = useState("idle"); // idle | loading | playing | result | review
+  const [mode, setMode] = useState("idle");
   const [reviewData, setReviewData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   const question = quiz[current];
 
-  /* ================= TIMER ================= */
   useEffect(() => {
     if (mode !== "playing") return;
-
-    if (timeLeft === 0) {
-      handleNext(true);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setTimeLeft((t) => t - 1);
-    }, 1000);
-
+    if (timeLeft === 0) { handleNext(true); return; }
+    const timer = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearTimeout(timer);
   }, [timeLeft, mode]);
 
-  /* ================= START QUIZ ================= */
   const startQuiz = async () => {
     setMode("loading");
     try {
       const res = await generateQuiz(pdfId);
       setQuiz(res.data.quiz);
-      setCurrent(0);
-      setSelected(null);
-      setAnswers([]);
-      setScore(0);
-      setTimeLeft(QUESTION_TIME);
-      setMode("playing");
+      setCurrent(0); setSelected(null); setAnswers([]); setScore(0);
+      setTimeLeft(QUESTION_TIME); setMode("playing");
     } catch (err) {
-      console.error("Quiz start failed", err);
-      setMode("idle");
+      console.error("Quiz start failed", err); setMode("idle");
     }
   };
 
-  /* ================= NEXT / SUBMIT ================= */
   const handleNext = (timeout = false) => {
-    // 🔍 DEBUGGING: Check your console (F12) if answers are still wrong!
     const valSelected = normalize(selected);
     const valCorrect = normalize(question?.correctAnswer);
-
-    // console.log(`Checking Q${current + 1}:`);
-    // console.log(`You chose: "${selected}" -> Normalized: "${valSelected}"`);
-    // console.log(
-    //   `Correct:   "${question?.correctAnswer}" -> Normalized: "${valCorrect}"`,
-    // );
-
     const isCorrect = !timeout && valSelected === valCorrect;
-    // console.log("Result:", isCorrect ? "✅ CORRECT" : "❌ WRONG");
-
-    if (isCorrect) {
-      setScore((s) => s + 1);
-    }
+    if (isCorrect) setScore((s) => s + 1);
 
     const newAnswer = {
-      question: question.question,
-      options: question.options,
-      selectedAnswer: timeout ? null : selected,
-      correctAnswer: question.correctAnswer,
-      isCorrect,
-      timeTaken: QUESTION_TIME - timeLeft,
+      question: question.question, options: question.options,
+      selectedAnswer: timeout ? null : selected, correctAnswer: question.correctAnswer,
+      isCorrect, timeTaken: QUESTION_TIME - timeLeft,
     };
-
     const updatedAnswers = [...answers, newAnswer];
     setAnswers(updatedAnswers);
-
-    setSelected(null);
-    setTimeLeft(QUESTION_TIME);
+    setSelected(null); setTimeLeft(QUESTION_TIME);
 
     if (current + 1 === quiz.length) {
       finishQuiz(updatedAnswers, isCorrect ? score + 1 : score);
@@ -114,17 +80,10 @@ export default function QuizTab({ pdfId }) {
     }
   };
 
-  /* ================= FINISH ================= */
   const finishQuiz = async (finalAnswers, finalScore) => {
     try {
       setSubmitting(true);
-      const payload = {
-        pdfId,
-        score: finalScore,
-        total: quiz.length,
-        answers: finalAnswers,
-      };
-      await submitQuizAttempt(payload);
+      await submitQuizAttempt({ pdfId, score: finalScore, total: quiz.length, answers: finalAnswers });
       setMode("result");
     } catch (err) {
       console.error("Quiz submit failed", err);
@@ -133,140 +92,210 @@ export default function QuizTab({ pdfId }) {
     }
   };
 
-  /* ================= LOAD REVIEW ================= */
   const loadReview = async () => {
     setMode("loading");
     try {
       const res = await getQuizReview(pdfId);
-      setReviewData(res.data);
-      setMode("review");
+      setReviewData(res.data); setMode("review");
     } catch (err) {
-      console.error("Review load failed", err);
-      setMode("result");
+      console.error("Review load failed", err); setMode("result");
     }
   };
 
-  /* ================= UI STATES ================= */
-
-  // 1. Loading
+  // === Loading ===
   if (mode === "loading") {
     return (
-      <div className="flex flex-col items-center justify-center h-[400px] space-y-6 animate-in fade-in zoom-in-95 duration-300">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-col items-center justify-center h-[400px] space-y-6"
+      >
         <div className="relative">
-          <div className="w-16 h-16 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin"></div>
+          <div className="w-16 h-16 border-4 rounded-full animate-spin"
+            style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
+          />
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-8 h-8 bg-blue-50 rounded-full"></div>
+            <div className="w-8 h-8 rounded-full" style={{ background: 'var(--accent-light)' }} />
           </div>
         </div>
-        <p className="text-slate-500 font-medium animate-pulse">
-          {submitting ?
-            "Submitting results..."
-          : "Generating quiz questions..."}
+        <p className="font-medium animate-pulse" style={{ color: 'var(--text-muted)' }}>
+          {submitting ? "Submitting results..." : "Generating quiz questions..."}
         </p>
-      </div>
+      </motion.div>
     );
   }
 
-  // 2. Idle (Start Screen)
+  // === Idle (Start Screen) ===
   if (mode === "idle") {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-sm max-w-2xl mx-auto mt-8">
-        <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm transform transition-transform hover:scale-110 duration-300">
-          <Play size={36} className="ml-1" />
-        </div>
-        <h2 className="text-3xl font-bold text-slate-900 mb-3 tracking-tight">
-          Ready to test your knowledge?
-        </h2>
-        <p className="text-slate-500 mb-10 text-lg max-w-md mx-auto leading-relaxed">
-          Our AI will generate a custom quiz based on this document to help you
-          master the material.
-        </p>
-        <button
-          onClick={startQuiz}
-          className="px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg rounded-xl font-bold shadow-lg shadow-blue-200 transition-all hover:-translate-y-1 active:scale-95">
-          Start Quiz Now
-        </button>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <SpotlightCard
+          className="relative overflow-hidden"
+          spotlightColor="rgba(16, 185, 129, 0.15)"
+        >
+          <div className="flex flex-col items-center justify-center p-12 text-center max-w-2xl mx-auto relative z-10">
+            <motion.div
+              animate={{ y: [0, -12, 0], rotate: [0, 5, -5, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="relative mb-8"
+            >
+              <div className="absolute inset-0 rounded-full blur-xl opacity-40 animate-pulse"
+                style={{ background: '#10b981', transform: 'scale(1.5)' }}
+              />
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center relative shadow-xl"
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #34d399)',
+                  boxShadow: '0 8px 32px rgba(16, 185, 129, 0.4)',
+                }}
+              >
+                <Play size={36} className="text-white ml-1" />
+              </div>
+            </motion.div>
+
+            <h2 className="text-3xl font-bold mb-3 tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              Ready to test your knowledge?
+            </h2>
+            <p className="text-lg max-w-md mx-auto leading-relaxed mb-10" style={{ color: 'var(--text-muted)' }}>
+              Our AI will generate a custom quiz based on this document to help you master the material.
+            </p>
+            <motion.button
+              onClick={startQuiz}
+              whileHover={{ scale: 1.05, y: -3, boxShadow: '0 16px 40px rgba(16, 185, 129, 0.4)' }}
+              whileTap={{ scale: 0.95 }}
+              className="px-10 py-4 text-white text-lg rounded-2xl font-bold transition-all relative overflow-hidden group"
+              style={{
+                background: 'linear-gradient(135deg, #10b981, #34d399)',
+                boxShadow: '0 8px 30px rgba(16, 185, 129, 0.35)',
+              }}
+            >
+              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              <span className="flex items-center gap-2 relative z-10">
+                <Zap size={20} />
+                Start Quiz Now
+              </span>
+            </motion.button>
+
+            <div className="absolute top-6 right-8 opacity-[0.03]">
+              <Trophy size={180} />
+            </div>
+          </div>
+        </SpotlightCard>
+      </motion.div>
     );
   }
 
-  // 3. Result Screen
+  // === Result Screen ===
   if (mode === "result") {
     const accuracy = Math.round((score / quiz.length) * 100);
     const isPassing = accuracy >= 70;
 
     return (
-      <div className="flex flex-col items-center p-10 bg-white rounded-3xl border border-slate-200 shadow-sm text-center max-w-2xl mx-auto mt-8 animate-in slide-in-from-bottom-8 duration-500">
-        <div
-          className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 text-4xl font-bold border-8 shadow-inner ${isPassing ? "bg-green-50 border-green-100 text-green-600" : "bg-orange-50 border-orange-100 text-orange-600"}`}>
-          {accuracy}%
-        </div>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, type: "spring" }}
+        className="rounded-3xl overflow-hidden max-w-2xl mx-auto mt-8"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-card)' }}
+      >
+        <div className="flex flex-col items-center p-10 text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="w-24 h-24 rounded-full flex items-center justify-center mb-6 text-4xl font-bold border-4"
+            style={{
+              background: isPassing ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+              borderColor: isPassing ? '#10b981' : '#f59e0b',
+              color: isPassing ? '#10b981' : '#f59e0b',
+              boxShadow: isPassing ? '0 0 40px rgba(16,185,129,0.2)' : '0 0 40px rgba(245,158,11,0.2)',
+            }}
+          >
+            {accuracy}%
+          </motion.div>
 
-        <h2 className="text-3xl font-bold text-slate-900 mb-2">
-          {isPassing ? "Excellent Work!" : "Keep Practicing!"}
-        </h2>
-        <p className="text-slate-500 mb-8 text-lg">
-          You scored <strong className="text-slate-900">{score}</strong> out of{" "}
-          <strong className="text-slate-900">{quiz.length}</strong> questions
-          correctly.
-        </p>
+          <h2 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+            {isPassing ? "Excellent Work!" : "Keep Practicing!"}
+          </h2>
+          <p className="text-lg mb-8" style={{ color: 'var(--text-muted)' }}>
+            You scored <strong style={{ color: 'var(--text-primary)' }}>{score}</strong> out of{" "}
+            <strong style={{ color: 'var(--text-primary)' }}>{quiz.length}</strong> questions correctly.
+          </p>
 
-        <div className="flex gap-4 w-full max-w-sm">
-          <button
-            onClick={startQuiz}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors">
-            <RotateCcw size={20} /> Retry
-          </button>
-          <button
-            onClick={loadReview}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5">
-            <FileText size={20} /> Review
-          </button>
+          <div className="flex gap-4 w-full max-w-sm">
+            <motion.button
+              whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+              onClick={startQuiz}
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-colors"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
+            >
+              <RotateCcw size={20} /> Retry
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.03, boxShadow: '0 8px 24px var(--accent-shadow)' }}
+              whileTap={{ scale: 0.97 }}
+              onClick={loadReview}
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 text-white font-semibold rounded-xl transition-all"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 15px var(--accent-shadow)' }}
+            >
+              <FileText size={20} /> Review
+            </motion.button>
+          </div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
-  // ... (keep your existing imports and helper functions)
-
-  // 4. Review Screen
+  // === Review Screen ===
   if (mode === "review" && reviewData) {
     return (
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden max-w-3xl mx-auto mt-4 animate-in fade-in duration-300">
-        {/* ... (Header stays same) ... */}
-        
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-3xl overflow-hidden max-w-3xl mx-auto mt-4"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-card)' }}
+      >
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
           {reviewData.attempt.answers.map((a, i) => {
-            // ✅ FIX: Re-calculate 'isCorrect' using our normalizer
-            // This ensures the visual feedback matches your logic, even if backend saved it differently
             const isActuallyCorrect = normalize(a.selectedAnswer) === normalize(a.correctAnswer);
-
             return (
-              <div 
-                key={i} 
-                className={`p-5 rounded-2xl border-l-4 shadow-sm ${
-                  isActuallyCorrect 
-                    ? 'bg-green-50/30 border-green-500 ring-1 ring-slate-100' 
-                    : 'bg-red-50/30 border-red-500 ring-1 ring-slate-100'
-                }`}
+              <div
+                key={i}
+                className="p-5 rounded-2xl border-l-4"
+                style={{
+                  background: isActuallyCorrect ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+                  borderColor: isActuallyCorrect ? '#10b981' : '#ef4444',
+                  border: '1px solid var(--border-light)',
+                  borderLeftWidth: '4px',
+                  borderLeftColor: isActuallyCorrect ? '#10b981' : '#ef4444',
+                }}
               >
                 <div className="flex items-start gap-4">
-                  <span className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold shadow-sm border ${isActuallyCorrect ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                  <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold shadow-sm text-white"
+                    style={{ background: isActuallyCorrect ? '#10b981' : '#ef4444' }}
+                  >
                     {i + 1}
                   </span>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 text-lg mb-3">{a.question}</h3>
-                    
+                    <h3 className="font-semibold text-lg mb-3" style={{ color: 'var(--text-primary)' }}>{a.question}</h3>
                     <div className="space-y-2 text-sm">
-                      <div className={`flex items-center gap-2 p-3 rounded-lg border ${isActuallyCorrect ? 'bg-green-100/50 border-green-200 text-green-800' : 'bg-red-100/50 border-red-200 text-red-800'}`}>
+                      <div className="flex items-center gap-2 p-3 rounded-lg"
+                        style={{
+                          background: isActuallyCorrect ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                          color: isActuallyCorrect ? '#10b981' : '#ef4444',
+                        }}
+                      >
                         {isActuallyCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                         <span className="font-medium">Your Answer: {a.selectedAnswer || "Time out"}</span>
                       </div>
-                      
-                      {/* Show 'Correct Answer' only if it was ACTUALLY wrong */}
                       {!isActuallyCorrect && (
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
-                          <CheckCircle2 size={18} className="text-green-600" />
+                        <div className="flex items-center gap-2 p-3 rounded-lg"
+                          style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)' }}
+                        >
+                          <CheckCircle2 size={18} style={{ color: '#10b981' }} />
                           <span>Correct Answer: <span className="font-semibold">{a.correctAnswer}</span></span>
                         </div>
                       )}
@@ -277,91 +306,129 @@ export default function QuizTab({ pdfId }) {
             );
           })}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
-  // 5. Playing State (The Quiz)
+  // === Playing State ===
   const progress = ((current + 1) / quiz.length) * 100;
 
   return (
-    <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden max-w-2xl mx-auto mt-4">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-3xl overflow-hidden max-w-2xl mx-auto mt-4"
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-card)' }}
+    >
       {/* Quiz Header */}
-      <div className="px-8 py-5 bg-slate-50/80 backdrop-blur border-b border-slate-200 flex justify-between items-center">
-        <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-          Question {current + 1} <span className="text-slate-300 mx-1">/</span>{" "}
-          {quiz.length}
+      <div className="px-8 py-5 flex justify-between items-center"
+        style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--bg-surface)' }}
+      >
+        <span className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          Question {current + 1} <span className="mx-1 opacity-50">/</span> {quiz.length}
         </span>
-        <div
-          className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-mono font-bold transition-colors ${timeLeft < 10 ? "bg-red-100 text-red-600 animate-pulse" : "bg-blue-50 text-blue-600"}`}>
+        <motion.div
+          animate={timeLeft < 10 ? { scale: [1, 1.1, 1] } : {}}
+          transition={{ repeat: Infinity, duration: 0.5 }}
+          className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-mono font-bold"
+          style={{
+            background: timeLeft < 10 ? 'var(--danger-bg)' : 'var(--accent-light)',
+            color: timeLeft < 10 ? 'var(--danger-text)' : 'var(--accent)',
+          }}
+        >
           <Clock size={16} />
           <span>{timeLeft}s</span>
-        </div>
+        </motion.div>
       </div>
 
       {/* Progress Bar */}
-      <div className="h-1.5 w-full bg-slate-100">
-        <div
-          className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500 ease-out rounded-r-full"
-          style={{ width: `${progress}%` }}
+      <div className="h-1.5 w-full" style={{ background: 'var(--bg-input)' }}>
+        <motion.div
+          className="h-full rounded-r-full"
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.5 }}
+          style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }}
         />
       </div>
 
       {/* Question Content */}
       <div className="p-8">
-        <h3 className="text-2xl font-bold text-slate-900 mb-8 leading-snug">
-          {question.question}
-        </h3>
+        <AnimatePresence mode="wait">
+          <motion.h3
+            key={current}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+            className="text-2xl font-bold mb-8 leading-snug"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {question.question}
+          </motion.h3>
+        </AnimatePresence>
 
         <div className="space-y-3">
           {question.options.map((opt, i) => (
-            <button
+            <motion.button
               key={i}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.08 }}
+              whileHover={{ scale: 1.01, x: 4 }}
+              whileTap={{ scale: 0.99 }}
               onClick={() => setSelected(opt)}
-              className={`group w-full p-4 pl-5 text-left rounded-2xl border-2 transition-all duration-200 flex items-center justify-between
-                ${
-                  selected === opt ?
-                    "border-blue-600 bg-blue-50/50 shadow-md ring-1 ring-blue-600"
-                  : "border-slate-200 hover:border-blue-400 hover:bg-slate-50"
-                }`}>
+              className="w-full p-4 pl-5 text-left rounded-2xl border-2 transition-all duration-200 flex items-center justify-between"
+              style={{
+                borderColor: selected === opt ? 'var(--accent)' : 'var(--border-color)',
+                background: selected === opt ? 'var(--accent-light)' : 'var(--bg-card)',
+                boxShadow: selected === opt ? '0 4px 16px var(--accent-shadow)' : 'none',
+              }}
+            >
               <div className="flex items-center gap-4">
                 <span
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors ${selected === opt ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-blue-500"}`}>
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors"
+                  style={{
+                    background: selected === opt ? 'var(--accent)' : 'var(--bg-surface)',
+                    color: selected === opt ? '#fff' : 'var(--text-muted)',
+                  }}
+                >
                   {String.fromCharCode(65 + i)}
                 </span>
-                <span
-                  className={`text-lg font-medium ${selected === opt ? "text-blue-900" : "text-slate-700"}`}>
+                <span className="text-lg font-medium" style={{ color: selected === opt ? 'var(--accent)' : 'var(--text-primary)' }}>
                   {opt}
                 </span>
               </div>
-
               {selected === opt && (
-                <CheckCircle2
-                  size={24}
-                  className="text-blue-600 animate-in zoom-in duration-300"
-                />
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300 }}>
+                  <CheckCircle2 size={24} style={{ color: 'var(--accent)' }} />
+                </motion.div>
               )}
-            </button>
+            </motion.button>
           ))}
         </div>
       </div>
 
       {/* Quiz Footer */}
-      <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-        <button
+      <div className="p-6 flex justify-end"
+        style={{ borderTop: '1px solid var(--border-light)', background: 'var(--bg-surface)' }}
+      >
+        <motion.button
           onClick={() => handleNext()}
           disabled={!selected || submitting}
-          className={`flex items-center gap-2 px-8 py-3.5 rounded-xl font-bold text-lg transition-all shadow-lg
-            ${
-              !selected || submitting ?
-                "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
-              : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 hover:-translate-y-0.5 active:scale-95"
-            }`}>
+          whileHover={selected ? { scale: 1.03, boxShadow: '0 8px 24px var(--accent-shadow)' } : {}}
+          whileTap={selected ? { scale: 0.97 } : {}}
+          className="flex items-center gap-2 px-8 py-3.5 rounded-xl font-bold text-lg transition-all"
+          style={{
+            background: !selected || submitting ? 'var(--bg-input)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            color: !selected || submitting ? 'var(--text-muted)' : '#fff',
+            boxShadow: !selected || submitting ? 'none' : '0 4px 15px var(--accent-shadow)',
+            cursor: !selected || submitting ? 'not-allowed' : 'pointer',
+          }}
+        >
           {current + 1 === quiz.length ? "Submit Results" : "Next Question"}
           <ChevronRight size={20} />
-        </button>
+        </motion.button>
       </div>
-    </div>
+    </motion.div>
   );
 }
-
