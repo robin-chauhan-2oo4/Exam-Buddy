@@ -21,6 +21,7 @@ const AIHistorySchema = new mongoose.Schema(
         "quiz_attempt",
         "chat",
         "ama",
+        "probable_questions",
       ],
       required: true,
     },

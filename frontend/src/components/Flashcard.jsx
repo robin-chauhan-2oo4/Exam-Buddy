@@ -1,161 +1,166 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, RotateCw } from "lucide-react";
+import { Check, X, RotateCw, Clock, ThumbsUp, CalendarClock } from "lucide-react";
 
-export default function Flashcard({
-  front,
-  back,
-  onKnown,
-  onUnknown,
-  isKnown,
-}) {
+export default function Flashcard({ front, back, onReview, isDue, nextReviewLabel }) {
   const [flipped, setFlipped] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  const handleFlip = () => setFlipped(!flipped);
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="group w-full max-w-md mx-auto h-[240px] sm:h-[280px] cursor-pointer"
-      style={{ perspective: "1200px" }}
-      onClick={handleFlip}
+    <div
+      className="w-full mx-auto select-none"
+      style={{ minHeight: "320px" }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <motion.div
-        className="relative w-full h-full"
-        style={{ transformStyle: "preserve-3d" }}
-        animate={{
-          rotateY: flipped ? 180 : 0,
-          scale: isHovered ? 1.02 : 1,
-        }}
-        transition={{
-          rotateY: { duration: 0.7, ease: [0.23, 1, 0.32, 1] },
-          scale: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-        }}
-      >
-        {/* FRONT FACE */}
-        <div
-          className="absolute inset-0 w-full h-full rounded-2xl flex flex-col items-center justify-center p-8 text-center"
-          style={{
-            backfaceVisibility: "hidden",
-            background: 'var(--bg-card)',
-            border: `2px solid ${isHovered && !flipped ? 'var(--accent)' : 'var(--border-color)'}`,
-            boxShadow: isHovered && !flipped
-              ? '0 12px 40px var(--accent-shadow)'
-              : 'var(--shadow-card)',
-            transition: 'border-color 0.3s ease, box-shadow 0.4s ease',
-          }}
-        >
-          {/* Gradient accent bar at top */}
-          <div
-            className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl"
-            style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #06b6d4)' }}
-          />
-
-          {/* Subtle decorative pattern */}
-          <div
-            className="absolute inset-0 rounded-2xl opacity-[0.02]"
-            style={{
-              backgroundImage: `radial-gradient(circle at 20% 30%, var(--accent) 1px, transparent 1px),
-                                radial-gradient(circle at 80% 70%, var(--accent) 1px, transparent 1px)`,
-              backgroundSize: '40px 40px',
-            }}
-          />
-
-          <h3
-            className="text-xl md:text-2xl font-semibold leading-relaxed relative z-10"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {front}
-          </h3>
-
+      <AnimatePresence mode="wait">
+        {!flipped ? (
+          /* ═══════ FRONT FACE ═══════ */
           <motion.div
-            animate={{ opacity: isHovered && !flipped ? 1 : 0, y: isHovered && !flipped ? 0 : 4 }}
-            transition={{ duration: 0.2 }}
-            className="absolute bottom-4 text-xs flex items-center gap-1.5"
-            style={{ color: 'var(--text-muted)' }}
+            key="front"
+            initial={{ rotateY: 90, opacity: 0 }}
+            animate={{ rotateY: 0, opacity: 1 }}
+            exit={{ rotateY: -90, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="w-full rounded-2xl flex flex-col items-center justify-center p-6 sm:p-10 text-center cursor-pointer relative overflow-hidden"
+            style={{
+              minHeight: "320px",
+              background: "var(--bg-card)",
+              border: `2px solid ${isHovered ? "var(--accent)" : "var(--border-color)"}`,
+              boxShadow: isHovered
+                ? "0 12px 40px var(--accent-shadow)"
+                : "var(--shadow-card)",
+              transition: "border-color 0.3s ease, box-shadow 0.4s ease",
+            }}
+            onClick={() => setFlipped(true)}
           >
-            <motion.div
-              animate={{ rotate: [0, 360] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            {/* Accent bar */}
+            <div
+              className="absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl"
+              style={{
+                background: isDue
+                  ? "linear-gradient(90deg, #f97316, #fb923c, #fbbf24)"
+                  : "linear-gradient(90deg, #6366f1, #8b5cf6, #06b6d4)",
+              }}
+            />
+
+            <h3
+              className="text-xl sm:text-2xl font-bold leading-relaxed"
+              style={{ color: "var(--text-primary)" }}
             >
-              <RotateCw size={12} />
-            </motion.div>
-            <span>Click to flip</span>
+              {front}
+            </h3>
+
+            <div
+              className="absolute bottom-5 text-xs flex items-center gap-2 font-semibold tracking-wider uppercase"
+              style={{
+                color: "var(--text-muted)",
+                opacity: isHovered ? 1 : 0.5,
+                transition: "opacity 0.2s",
+              }}
+            >
+              <RotateCw size={13} />
+              <span>Click to reveal answer</span>
+            </div>
           </motion.div>
-        </div>
+        ) : (
+          /* ═══════ BACK FACE ═══════ */
+          <motion.div
+            key="back"
+            initial={{ rotateY: -90, opacity: 0 }}
+            animate={{ rotateY: 0, opacity: 1 }}
+            exit={{ rotateY: 90, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="w-full rounded-2xl flex flex-col p-5 sm:p-6 relative overflow-hidden"
+            style={{
+              minHeight: "320px",
+              background: "var(--bg-surface)",
+              border: "2px solid var(--border-color)",
+              boxShadow: "var(--shadow-card)",
+            }}
+          >
+            {/* Green accent bar */}
+            <div
+              className="absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl"
+              style={{ background: "linear-gradient(90deg, #10b981, #34d399, #6ee7b7)" }}
+            />
 
-        {/* BACK FACE */}
-        <div
-          className="absolute inset-0 w-full h-full rounded-2xl flex flex-col items-center justify-between p-6 text-center"
-          style={{
-            backfaceVisibility: "hidden",
-            transform: "rotateY(180deg)",
-            background: 'var(--bg-surface)',
-            border: '2px solid var(--border-color)',
-            boxShadow: 'var(--shadow-card)',
-          }}
-        >
-          {/* Gradient accent bar at top */}
-          <div
-            className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl"
-            style={{ background: 'linear-gradient(90deg, #10b981, #34d399, #6ee7b7)' }}
-          />
-
-          {/* Answer Content */}
-          <div className="flex-1 flex items-center justify-center overflow-y-auto w-full custom-scrollbar pt-4">
-            <p className="text-lg font-medium leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              {back}
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="w-full grid grid-cols-2 gap-3 mt-4 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
-            <motion.button
-              whileHover={{ scale: 1.06, y: -2, boxShadow: '0 6px 20px rgba(239, 68, 68, 0.2)' }}
-              whileTap={{ scale: 0.94 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onUnknown();
-              }}
-              className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold shadow-sm relative overflow-hidden"
-              style={{
-                background: 'var(--danger-bg)',
-                border: '1px solid var(--danger-border)',
-                color: 'var(--danger-text)',
-                transition: 'box-shadow 0.3s ease',
-              }}
+            {/* Answer Content — tap to flip back */}
+            <div
+              className="flex-1 flex flex-col items-center justify-center overflow-y-auto w-full pt-3 mb-3 cursor-pointer"
+              onClick={() => setFlipped(false)}
             >
-              <X size={16} />
-              Hard
-            </motion.button>
+              <p
+                className="text-[10px] uppercase font-extrabold tracking-widest mb-3 opacity-40"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Q: {front}
+              </p>
+              <p
+                className="text-base sm:text-lg font-medium leading-relaxed text-center"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {back}
+              </p>
+              <p
+                className="text-[10px] uppercase font-bold tracking-wider mt-4 opacity-30"
+                style={{ color: "var(--text-muted)" }}
+              >
+                ↑ Tap answer to flip back
+              </p>
+            </div>
 
-            <motion.button
-              whileHover={{ scale: 1.06, y: -2, boxShadow: '0 6px 20px rgba(16, 185, 129, 0.25)' }}
-              whileTap={{ scale: 0.94 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onKnown();
-              }}
-              className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold shadow-sm relative overflow-hidden"
-              style={{
-                background: isKnown ? 'rgba(16, 185, 129, 0.2)' : 'var(--success-bg)',
-                border: `1px solid ${isKnown ? '#10b981' : 'var(--success-text)'}`,
-                color: 'var(--success-text)',
-                boxShadow: isKnown ? '0 0 20px rgba(16, 185, 129, 0.25)' : 'none',
-                transition: 'box-shadow 0.3s ease',
-              }}
-            >
-              <Check size={16} />
-              {isKnown ? "Mastered ✓" : "Easy"}
-            </motion.button>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
+            {/* SRS Buttons — ONLY when card is due */}
+            {isDue && (
+              <div
+                className="w-full flex gap-2 pt-3 shrink-0"
+                style={{ borderTop: "1px solid var(--border-light)" }}
+              >
+                {[
+                  { label: "Again", quality: 0, icon: X, bg: "var(--danger-bg)", color: "var(--danger-text)", border: "var(--danger-border)" },
+                  { label: "Hard", quality: 3, icon: Clock, bg: "rgba(249,115,22,0.1)", color: "#f97316", border: "rgba(249,115,22,0.2)" },
+                  { label: "Good", quality: 4, icon: ThumbsUp, bg: "var(--success-bg)", color: "var(--success-text)", border: "var(--success-border)" },
+                  { label: "Easy", quality: 5, icon: Check, bg: "rgba(59,130,246,0.1)", color: "#3b82f6", border: "rgba(59,130,246,0.2)" },
+                ].map((btn) => {
+                  const Icon = btn.icon;
+                  return (
+                    <button
+                      key={btn.label}
+                      type="button"
+                      onClick={() => {
+                        if (onReview) onReview(btn.quality);
+                        setFlipped(false);
+                      }}
+                      className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-xs font-bold cursor-pointer hover:brightness-110 active:scale-95 transition-all"
+                      style={{
+                        background: btn.bg,
+                        color: btn.color,
+                        border: `1px solid ${btn.border}`,
+                      }}
+                    >
+                      <Icon size={16} style={{ pointerEvents: "none" }} />
+                      {btn.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Next review info — when NOT due */}
+            {!isDue && nextReviewLabel && (
+              <div
+                className="w-full flex items-center justify-center gap-2 pt-3 shrink-0"
+                style={{ borderTop: "1px solid var(--border-light)" }}
+              >
+                <CalendarClock size={14} style={{ color: "#10b981" }} />
+                <span className="text-xs font-semibold" style={{ color: "#10b981" }}>
+                  Next review: {nextReviewLabel}
+                </span>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

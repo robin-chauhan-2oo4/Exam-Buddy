@@ -72,7 +72,7 @@ export const saveQuizAttempt = async (req, res) => {
         answers: sanitizedAnswers,
       },
     });
-    console.log("QUIZ ATTEMPT BODY:", req.body);
+    // console.log("QUIZ ATTEMPT BODY:", req.body);
 
 
     res.status(201).json({ attempt });

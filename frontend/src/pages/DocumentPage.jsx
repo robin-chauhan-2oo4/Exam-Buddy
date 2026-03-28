@@ -17,6 +17,7 @@ import SummaryTab from "../components/tabs/SummaryTab";
 import FlashcardsTab from "../components/tabs/FlashcardsTab";
 import QuizTab from "../components/tabs/QuizTab";
 import ChatTab from "../components/tabs/ChatTab";
+import ProbableQuestionsTab from "../components/tabs/ProbableQuestionsTab";
 
 export default function DocumentPage() {
   const { id } = useParams();
@@ -141,6 +142,7 @@ export default function DocumentPage() {
           {activeTab === "summary" && <SummaryTab pdfId={id} />}
           {activeTab === "flashcards" && <FlashcardsTab pdfId={id} />}
           {activeTab === "quiz" && <QuizTab pdfId={id} />}
+          {activeTab === "probable" && <ProbableQuestionsTab pdfId={id} />}
           {activeTab === "chat" && <ChatTab pdfId={id} />}
         </motion.div>
       </motion.div>

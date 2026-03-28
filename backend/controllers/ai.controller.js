@@ -313,7 +313,9 @@
 
 import PDF from "../models/PDF.js";
 import AIHistory from "../models/History.js";
-import { aiClient, modelName } from "../config/gemini.js";
+import Flashcard from "../models/Flashcard.js";
+import { getAiClient, rotateApiKey, getTotalKeys, modelName, fallbackModel } from "../config/gemini.js";
+import { awardXP } from "./gamification.controller.js";
 
 /* ======================================================
    HELPERS
@@ -339,43 +341,105 @@ const getText = (response) => {
  * Robust JSON parser for LLM outputs
  */
 const parseJSON = (text) => {
-  if (!text) return [];
+  if (!text) return null;
   try {
     let cleaned = text.replace(/```json|```/g, "").trim();
-    const start = cleaned.indexOf("[");
-    const end = cleaned.lastIndexOf("]") + 1;
-    if (start === -1 || end === 0) return [];
+    const startArray = cleaned.indexOf("[");
+    const startObj = cleaned.indexOf("{");
+    
+    let start = -1;
+    let end = 0;
+    
+    if (startArray !== -1 && (startObj === -1 || startArray < startObj)) {
+      start = startArray;
+      end = cleaned.lastIndexOf("]") + 1;
+    } else if (startObj !== -1) {
+      start = startObj;
+      end = cleaned.lastIndexOf("}") + 1;
+    }
+
+    if (start === -1 || end === 0) return null;
 
     cleaned = cleaned.slice(start, end);
     cleaned = cleaned.replace(/,\s*([\]}])/g, "$1"); // remove trailing commas
     return JSON.parse(cleaned);
   } catch {
-    return [];
+    return null;
   }
 };
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const handleAIError = (err, res, defaultMsg) => {
+  if (err.message === "QUOTA_EXHAUSTED") {
+    return res.status(429).json({ message: "Daily AI Limit Reached across all keys. Please check back tomorrow!" });
+  }
+  if (err.message === "RATE_LIMIT" || err.message === "SERVICE_UNAVAILABLE") {
+    return res.status(503).json({ message: "AI services are currently overloaded. Please try again later." });
+  }
+  res.status(500).json({ message: defaultMsg });
+};
+
+// Keep track of if we're currently in fallback mode (globally)
+let isUsingFallbackModel = false;
+
 /**
- * Single, safe Gemini call
+ * Single, safe Gemini call with Exponential Backoff + Rotation + Fallback
  */
-const generateSmart = async (userPrompt, systemPrompt) => {
-  try {
-    return await aiClient.models.generateContent({
-      model: modelName,
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: userPrompt }],
+const generateSmart = async (userPrompt, systemPrompt, maxRetries = 4) => {
+  let attempt = 0;
+  let keysTried = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      const activeClient = getAiClient();
+      return await activeClient.models.generateContent({
+        model: isUsingFallbackModel ? fallbackModel : modelName,
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: userPrompt }],
+          },
+        ],
+        config: {
+          systemInstruction: systemPrompt,
         },
-      ],
-      config: {
-        systemInstruction: systemPrompt,
-      },
-    });
-  } catch (err) {
-    if (err.status === 429) {
-      throw new Error("RATE_LIMIT");
+      });
+    } catch (err) {
+      const msg = err.message?.toLowerCase() || "";
+      const isQuota = msg.includes("quota") || msg.includes("exhausted") || msg.includes("billing");
+      const isRateLimit = err.status === 429 && !isQuota;
+      const isRetryable = isRateLimit || err.status === 503 || err.status === 500;
+
+      if (isQuota) {
+        keysTried++;
+        if (keysTried < getTotalKeys()) {
+          rotateApiKey();
+          continue;
+        }
+
+        if (!isUsingFallbackModel) {
+          console.warn(`[QUOTA] Model "${modelName}" exhausted. Swapping to "${fallbackModel}".`);
+          isUsingFallbackModel = true;
+          keysTried = 0;
+          continue;
+        }
+
+        throw new Error("QUOTA_EXHAUSTED");
+      }
+
+      if (isRetryable) {
+        attempt++;
+        if (attempt >= maxRetries) {
+          throw new Error(isRateLimit ? "RATE_LIMIT" : "SERVICE_UNAVAILABLE");
+        }
+        const waitTime = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+        console.warn(`Gemini API Error (${err.status}). Retrying in ${Math.round(waitTime/1000)}s... (Attempt ${attempt} of ${maxRetries})`);
+        await delay(waitTime);
+      } else {
+        throw err;
+      }
     }
-    throw err;
   }
 };
 
@@ -393,7 +457,8 @@ export const generateSummary = async (req, res) => {
 
     const prompt = `
 Create a detailed, exam-ready summary from the content below.
-Use headings and bullet points. Avoid fluff.
+Use headings, bold text, and bullet points to structure the summary.
+CRITICAL: You MUST include at least one expertly structured Markdown table summarizing key concepts, comparing ideas, or listing important data points at the end of the summary.
 
 CONTENT:
 ${text}
@@ -418,10 +483,13 @@ ${text}
       output: summary,
     });
 
-    res.status(200).json({ summary });
+    // Award 20 XP for generating a summary
+    const gamificationResult = await awardXP(req.user.id, 20);
+
+    res.status(200).json({ summary, gamification: gamificationResult });
   } catch (err) {
     console.error("Summary Error:", err);
-    res.status(500).json({ message: "Summary generation failed." });
+    return handleAIError(err, res, "Summary generation failed.");
   }
 };
 
@@ -461,17 +529,29 @@ ${text}
       });
     }
 
-    await AIHistory.create({
+    const existingCards = await Flashcard.find({ pdf: pdfId }).select('deckName');
+    const existingDecks = [...new Set(existingCards.map(c => c.deckName || 'Deck 1'))];
+    const newDeckName = `Deck ${existingDecks.length + 1}`;
+
+    const cardsToInsert = flashcards.map(fc => ({
       user: req.user.id,
       pdf: pdfId,
-      type: "flashcards",
-      output: flashcards,
-    });
+      deckName: newDeckName,
+      front: fc.question || fc.front || 'Empty Front',
+      back: fc.answer || fc.back || 'Empty Back',
+      nextReviewDate: Date.now(),
+      interval: 0,
+      easeFactor: 2.5,
+      repetitions: 0
+    }));
 
-    res.status(200).json({ flashcards });
+    await Flashcard.insertMany(cardsToInsert);
+
+    // Provide a legacy 'flashcards' reference for standard responses if needed
+    res.status(200).json({ flashcards: cardsToInsert });
   } catch (err) {
     console.error("Flashcards Error:", err);
-    res.status(500).json({ message: "Flashcards generation failed." });
+    return handleAIError(err, res, "Flashcards generation failed.");
   }
 };
 
@@ -529,15 +609,13 @@ ${text}
       output: quiz,
     });
 
-    res.status(200).json({ quiz });
+    // Award 50 XP for generating/taking a quiz
+    const gamificationResult = await awardXP(req.user.id, 50);
+
+    res.status(200).json({ quiz, gamification: gamificationResult });
   } catch (err) {
     console.error("Quiz Error:", err);
-    res.status(500).json({ message: "Quiz generation failed." });
-    if (err.message === "RATE_LIMIT") {
-      return res.status(429).json({
-        message: "AI quota exceeded. Please try again in a few seconds.",
-      });
-    }
+    return handleAIError(err, res, "Quiz generation failed.");
   }
 };
 
@@ -575,7 +653,7 @@ export const chatWithPDF = async (req, res) => {
     res.status(200).json({ answer });
   } catch (err) {
     console.error("Chat Error:", err);
-    res.status(500).json({ message: "Chat failed." });
+    return handleAIError(err, res, "Chat failed.");
   }
 };
 
@@ -602,10 +680,13 @@ export const askAnything = async (req, res) => {
       output: answer,
     });
 
-    res.status(200).json({ answer });
+    // Award 10 XP for asking a question (AMA)
+    const gamificationResult = await awardXP(req.user.id, 10);
+
+    res.status(200).json({ answer, gamification: gamificationResult });
   } catch (err) {
     console.error("AMA Error:", err);
-    res.status(500).json({ message: "AMA failed." });
+    return handleAIError(err, res, "AMA failed.");
   }
 };
 
@@ -690,5 +771,144 @@ export const getChatHistory = async (req, res) => {
   } catch (error) {
     console.error("Get Chat History Error:", error);
     res.status(500).json({ message: "Failed to load chat history" });
+  }
+};
+
+/* ======================================================
+   PROBABLE EXAM QUESTIONS
+====================================================== */
+
+export const generateProbableQuestions = async (req, res) => {
+  try {
+    const { pdfId, existingQuestions = [] } = req.body;
+    const pdf = await PDF.findById(pdfId);
+    if (!pdf) return res.status(404).json({ message: "PDF not found" });
+
+    const text = pdf.extractedText?.slice(0, 20000) || "";
+    
+    const avoidDuplicatePrompt = existingQuestions.length > 0 
+      ? `CRITICAL: Do not generate any questions that are similar to the following existing questions:\n${existingQuestions.map(q => `- ${q}`).join('\n')}\n\n` 
+      : "";
+
+    const prompt = `
+You are an expert professor preparing a final exam. Based on the following document CONTENT, generate a list of the 5-10 most probable exam questions.
+
+${avoidDuplicatePrompt}RULES:
+- Output MUST be valid JSON.
+- No markdown formatting outside the JSON structure.
+- Include a mix of short answer and essay-style questions.
+
+FORMAT:
+[
+  {
+    "question": "string",
+    "importance": "High" | "Medium" | "Low",
+    "suggestedAnswer": "string (a concise but comprehensive answer key)"
+  }
+]
+
+CONTENT:
+${text}
+`;
+
+    const response = await generateSmart(
+      prompt,
+      "Return ONLY valid JSON array. You are an expert exam creator."
+    );
+
+    const questions = parseJSON(getText(response));
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      return res.status(422).json({
+        message: "AI failed to generate probable questions. Please try again.",
+      });
+    }
+
+    // Fetch existing or create new history to keep everything consolidated
+    const existingHistory = await AIHistory.findOne({ user: req.user.id, pdf: pdfId, type: "probable_questions" });
+    let finalQuestions = [];
+
+    if (existingHistory) {
+      finalQuestions = [...(existingHistory.output || []), ...questions];
+      existingHistory.output = finalQuestions;
+      await existingHistory.save();
+    } else {
+      finalQuestions = questions;
+      await AIHistory.create({
+        user: req.user.id,
+        pdf: pdfId,
+        type: "probable_questions",
+        output: finalQuestions,
+      });
+    }
+
+    res.status(200).json({ questions: finalQuestions });
+  } catch (err) {
+    console.error("Probable Questions Error:", err);
+    return handleAIError(err, res, "Failed to generate probable questions.");
+  }
+};
+
+export const getProbableQuestionsHistory = async (req, res) => {
+  try {
+    const { pdfId } = req.params;
+    if (!pdfId) {
+      return res.status(400).json({ message: "PDF ID is required" });
+    }
+    const history = await AIHistory.find({
+      user: req.user.id,
+      pdf: pdfId,
+      type: "probable_questions",
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({ history });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to load probable questions history" });
+  }
+};
+
+export const updateProbableQuestions = async (req, res) => {
+  try {
+    const { pdfId, updatedQuestions } = req.body;
+    await AIHistory.findOneAndUpdate(
+      { user: req.user.id, pdf: pdfId, type: "probable_questions" },
+      { output: updatedQuestions }
+    );
+    res.status(200).json({ message: "Questions updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update questions" });
+  }
+};
+
+export const elaborateQuestion = async (req, res) => {
+  try {
+    const { pdfId, question, currentAnswer } = req.body;
+    const pdf = await PDF.findById(pdfId);
+    if (!pdf) return res.status(404).json({ message: "PDF not found" });
+
+    const text = pdf.extractedText?.slice(0, 20000) || "";
+    const prompt = `Based on the following document CONTENT, provide a highly detailed, comprehensive, and elaborated answer to the QUESTION.
+Use headings, bold text, and bullet points where appropriate to make it easily readable. Do not wrap the response in JSON, just return markdown.
+
+QUESTION: ${question}
+CURRENT SUMMARY: ${currentAnswer}
+
+CONTENT:
+${text}`;
+
+    const response = await generateSmart(
+      prompt,
+      "You are a detailed expert tutor. Return ONLY proper Markdown. Do not return JSON."
+    );
+
+    const elaborated = getText(response);
+    
+    if (!elaborated) {
+      return res.status(422).json({ message: "AI failed to elaborate." });
+    }
+
+    res.status(200).json({ answer: elaborated });
+  } catch (err) {
+    console.error("Elaborate Error:", err);
+    res.status(500).json({ message: "Failed to elaborate answer." });
   }
 };

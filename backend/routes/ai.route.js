@@ -9,6 +9,10 @@ import {
   askAnything,
   getAMAHistory,
   getAllQuizzes,
+  generateProbableQuestions,
+  getProbableQuestionsHistory,
+  updateProbableQuestions,
+  elaborateQuestion,
 } from "../controllers/ai.controller.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
@@ -18,6 +22,10 @@ const router = express.Router();
 router.post("/summary", authMiddleware, generateSummary);
 router.post("/flashcards", authMiddleware, generateFlashcards);
 router.post("/quiz", authMiddleware, generateQuiz);
+router.post("/probable-questions", authMiddleware, generateProbableQuestions);
+router.get("/probable-questions/history/:pdfId", authMiddleware, getProbableQuestionsHistory);
+router.put("/probable-questions", authMiddleware, updateProbableQuestions);
+router.post("/probable-questions/elaborate", authMiddleware, elaborateQuestion);
 
 // --- Chat Routes ---
 router.post("/chat", authMiddleware, chatWithPDF);

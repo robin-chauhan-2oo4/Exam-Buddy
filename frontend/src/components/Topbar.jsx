@@ -3,12 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 import API from "../services/apiClient";
-import { Search, Bell, LogOut, Menu, Sun, Moon, FileText, X } from "lucide-react";
+import { Search, Bell, LogOut, Menu, Sun, Moon, FileText, X, Flame, Star } from "lucide-react";
+import FocusTimer from "./FocusTimer";
+import LevelUpModal from "./LevelUpModal";
+import LevelProgressionModal from "./LevelProgressionModal";
 
 export default function Topbar({ onToggleSidebar }) {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [user, setUser] = useState({ name: "Student", plan: "Free" });
+  const [stats, setStats] = useState({ level: 1, currentStreak: 0, xp: 0 });
+  const prevLevelRef = useRef(null);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [showProgression, setShowProgression] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,7 +47,34 @@ export default function Topbar({ onToggleSidebar }) {
         }
       }
     }
+    
+    async function fetchStats() {
+      try {
+        const res = await API.get("/progress/stats");
+        if (res.data.stats) {
+          const newLevel = res.data.stats.level || 1;
+          
+          if (prevLevelRef.current !== null && newLevel > prevLevelRef.current) {
+            setShowLevelUp(true);
+          }
+          
+          if (prevLevelRef.current === null || newLevel > prevLevelRef.current) {
+             prevLevelRef.current = newLevel;
+          }
+
+          setStats(res.data.stats);
+        }
+      } catch (error) {
+        console.error("Failed to fetch gamification stats", error);
+      }
+    }
+
     fetchUser();
+    fetchStats();
+
+    // Setup an interval to periodically refresh stats without full reload
+    const interval = setInterval(fetchStats, 60000); 
+    return () => clearInterval(interval);
   }, []);
 
   // Close search dropdown on outside click
@@ -105,9 +139,10 @@ export default function Topbar({ onToggleSidebar }) {
   const showDropdown = searchFocused && searchQuery.trim().length > 0;
 
   return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
+    <>
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 sticky top-0 z-40 glass shrink-0"
       style={{
@@ -262,6 +297,41 @@ export default function Topbar({ onToggleSidebar }) {
           </AnimatePresence>
         </motion.button>
 
+        {/* Gamification Stats */}
+        <div className="hidden lg:flex items-center gap-2 mr-2">
+          {/* Level Badge */}
+          <motion.div 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowProgression(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm cursor-pointer transition-colors"
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1))',
+              border: '1px solid var(--accent)',
+              color: 'var(--accent)'
+            }}
+          >
+            <Star size={14} className="fill-current" />
+            Lvl {stats.level}
+          </motion.div>
+          
+          {/* Streak Badge */}
+          <div 
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm"
+            style={{ 
+              background: stats.currentStreak > 0 ? 'linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(251, 146, 60, 0.1))' : 'var(--bg-card)',
+              border: stats.currentStreak > 0 ? '1px solid #f97316' : '1px solid var(--border-color)',
+              color: stats.currentStreak > 0 ? '#f97316' : 'var(--text-muted)'
+            }}
+          >
+            <Flame size={14} className={stats.currentStreak > 0 ? "fill-current" : ""} />
+            {stats.currentStreak} Day{stats.currentStreak !== 1 && 's'}
+          </div>
+        </div>
+
+        {/* Focus Timer */}
+        <FocusTimer />
+
         {/* Notification Bell */}
         <motion.button
           whileHover={{ scale: 1.1 }}
@@ -410,5 +480,22 @@ export default function Topbar({ onToggleSidebar }) {
         )}
       </AnimatePresence>
     </motion.header>
+
+    <AnimatePresence>
+      {showLevelUp && (
+        <LevelUpModal level={stats.level} onClose={() => setShowLevelUp(false)} />
+      )}
+    </AnimatePresence>
+
+    <AnimatePresence>
+      {showProgression && (
+        <LevelProgressionModal
+          isOpen={showProgression}
+          onClose={() => setShowProgression(false)}
+          stats={stats}
+        />
+      )}
+    </AnimatePresence>
+    </>
   );
 }

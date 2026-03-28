@@ -257,13 +257,14 @@ export default function SummaryViewPage() {
               remarkPlugins={[remarkGfm]}
               components={{
                 table: ({ node, ...props }) => (
-                  <div className="overflow-x-auto my-6">
-                    <table className="min-w-full divide-y border" {...props} />
+                  <div className="overflow-x-auto my-6 rounded-xl shadow-sm" style={{ border: '1px solid var(--border-color)' }}>
+                    <table className="min-w-full divide-y" style={{ borderColor: 'var(--border-color)' }} {...props} />
                   </div>
                 ),
-                thead: ({ node, ...props }) => <thead className="bg-opacity-10 bg-gray-500" {...props} />,
-                th: ({ node, ...props }) => <th className="px-4 py-2 text-left font-bold" {...props} />,
-                td: ({ node, ...props }) => <td className="px-4 py-2 border-t" {...props} />,
+                thead: ({ node, ...props }) => <thead style={{ background: 'var(--bg-surface)' }} {...props} />,
+                tbody: ({ node, ...props }) => <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }} {...props} />,
+                th: ({ node, ...props }) => <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }} {...props} />,
+                td: ({ node, ...props }) => <td className="px-4 py-3 align-top leading-relaxed text-sm" style={{ color: 'var(--text-secondary)' }} {...props} />,
                 h1: ({ node, ...props }) => <h1 className="text-3xl font-bold mt-6 mb-4 leading-tight" {...props} />,
                 h2: ({ node, ...props }) => <h2 className="text-2xl font-bold mt-5 mb-3 leading-tight" {...props} />,
                 h3: ({ node, ...props }) => <h3 className="text-xl font-bold mt-4 mb-2 leading-tight" {...props} />,

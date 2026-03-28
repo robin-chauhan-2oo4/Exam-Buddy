@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import API from "../../services/apiClient";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { toast } from "react-toastify";
 
 export default function ChatTab({ pdfId }) {
@@ -421,8 +422,18 @@ export default function ChatTab({ pdfId }) {
                   }}
                 >
                   <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
                     components={{
                       p: ({ node, ...props }) => <p {...props} className="mb-0 font-medium" />,
+                      table: ({ node, ...props }) => (
+                        <div className="overflow-x-auto my-3 rounded-lg" style={{ border: '1px solid var(--border-color)' }}>
+                          <table className="min-w-full divide-y" style={{ borderColor: 'var(--border-color)' }} {...props} />
+                        </div>
+                      ),
+                      thead: ({ node, ...props }) => <thead style={{ background: 'var(--bg-input)' }} {...props} />,
+                      tbody: ({ node, ...props }) => <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }} {...props} />,
+                      th: ({ node, ...props }) => <th className="px-3 py-2 text-left text-xs font-bold uppercase" style={{ color: 'var(--text-muted)' }} {...props} />,
+                      td: ({ node, ...props }) => <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-secondary)' }} {...props} />,
                     }}
                   >
                     {msg.text}

@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Layers,
   FileText,
+  HelpCircle,
 } from "lucide-react";
 
 export default function DocumentTabs({ active, onChange }) {
@@ -11,6 +12,7 @@ export default function DocumentTabs({ active, onChange }) {
     { id: "summary", label: "Summary", icon: FileText },
     { id: "flashcards", label: "Flashcards", icon: Layers },
     { id: "quiz", label: "Practice Quiz", icon: CheckCircle2 },
+    { id: "probable", label: "Probable Questions", icon: HelpCircle },
     { id: "chat", label: "AI Chat", icon: MessageSquare },
   ];
 

@@ -8,7 +8,11 @@ export const generateFlashcards = (pdfId) => {
 };
 
 export const getFlashcardsHistory = (pdfId) => {
-  return API.get(`/history/pdf/${pdfId}/flashcards`);
+  return API.get(`/flashcards/${pdfId}`);
+};
+
+export const reviewFlashcard = (cardId, quality) => {
+  return API.put(`/flashcards/${cardId}/review`, { quality });
 };
 
 

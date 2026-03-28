@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import API from "../services/apiClient";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import Layout from "../components/Layout.jsx";
 import { toast } from "react-toastify";
 export default function AMAPage() {
@@ -303,7 +304,7 @@ export default function AMAPage() {
                   >
                     {msg.role === "user" ? <User size={14} /> : <Sparkles size={14} />}
                   </motion.div>
-                  <div className="px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-[13px] sm:text-[14px] leading-relaxed shadow-sm"
+                  <div className="px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-[13px] sm:text-[14px] leading-relaxed shadow-sm normalized-text w-full overflow-x-auto"
                     style={{
                       background: msg.role === "user"
                         ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
@@ -314,7 +315,22 @@ export default function AMAPage() {
                       borderTopLeftRadius: msg.role !== "user" ? 0 : undefined,
                     }}
                   >
-                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        table: ({ node, ...props }) => (
+                          <div className="overflow-x-auto my-3 rounded-lg" style={{ border: '1px solid var(--border-color)' }}>
+                            <table className="min-w-full divide-y" style={{ borderColor: 'var(--border-color)' }} {...props} />
+                          </div>
+                        ),
+                        thead: ({ node, ...props }) => <thead style={{ background: 'var(--bg-input)' }} {...props} />,
+                        tbody: ({ node, ...props }) => <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }} {...props} />,
+                        th: ({ node, ...props }) => <th className="px-3 py-2 text-left text-xs font-bold uppercase" style={{ color: 'var(--text-muted)' }} {...props} />,
+                        td: ({ node, ...props }) => <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-secondary)' }} {...props} />,
+                      }}
+                    >
+                      {msg.text}
+                    </ReactMarkdown>
                   </div>
                 </div>
               </motion.div>

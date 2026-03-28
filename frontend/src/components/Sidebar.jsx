@@ -12,6 +12,7 @@ import {
   Sun,
   Moon,
   X,
+  CalendarDays,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import GradientText from "./reactbits/GradientText";
@@ -143,9 +144,10 @@ export default function Sidebar({ onCloseMobile }) {
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
         <SidebarLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" isCollapsed={collapsed} index={0} onClick={onCloseMobile} />
         <SidebarLink to="/documents" icon={<FileText size={20} />} label="Documents" isCollapsed={collapsed} index={1} onClick={onCloseMobile} />
-        <SidebarLink to="/quiz-history" icon={<GraduationCap size={20} />} label="Quiz History" isCollapsed={collapsed} index={2} onClick={onCloseMobile} />
-        <SidebarLink to="/ama" icon={<Bot size={20} />} label="Ask AI (AMA)" isCollapsed={collapsed} index={3} onClick={onCloseMobile} />
-        <SidebarLink to="/profile" icon={<UserCircle size={20} />} label="Profile" isCollapsed={collapsed} index={4} onClick={onCloseMobile} />
+        <SidebarLink to="/planner" icon={<CalendarDays size={20} />} label="Study Planner" isCollapsed={collapsed} index={2} onClick={onCloseMobile} />
+        <SidebarLink to="/quiz-history" icon={<GraduationCap size={20} />} label="Quiz History" isCollapsed={collapsed} index={3} onClick={onCloseMobile} />
+        <SidebarLink to="/ama" icon={<Bot size={20} />} label="Ask AI (AMA)" isCollapsed={collapsed} index={4} onClick={onCloseMobile} />
+        <SidebarLink to="/profile" icon={<UserCircle size={20} />} label="Profile" isCollapsed={collapsed} index={5} onClick={onCloseMobile} />
       </nav>
 
       {/* Footer */}

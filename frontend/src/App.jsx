@@ -13,6 +13,7 @@ import SummaryViewPage from "./pages/SummaryViewPage";
 import ProfilePage from "./pages/ProfilePage";
 import QuizHistoryPage from "./pages/QuizHistory";
 import AMAPage from "./pages/AMAPage";
+import StudyPlannerPage from "./pages/StudyPlanner";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -100,6 +101,16 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AMAPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* AI Study Planner Route */}
+          <Route
+            path="/planner"
+            element={
+              <ProtectedRoute>
+                <StudyPlannerPage />
               </ProtectedRoute>
             }
           />
