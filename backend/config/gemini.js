@@ -35,4 +35,4 @@ export const getTotalKeys = () => keys.length;
 // ✅ CONFIRMED WORKING MODEL
 export const modelName = "gemini-flash-latest";
 // ✅ FALLBACK MODEL (Cheaper & High Quota)
-export const fallbackModel = "gemini-1.5-flash-8b";
+export const fallbackModel = "gemini-flash-lite-latest";

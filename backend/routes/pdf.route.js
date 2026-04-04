@@ -7,6 +7,7 @@ import {
   getUserPDFs,
   getPDFById,
   deletePDF,
+  uploadYoutube,
 } from "../controllers/pdf.controller.js";
 
 const router = express.Router();
@@ -16,6 +17,12 @@ router.post(
   authMiddleware,
   upload.single("pdf"),
   uploadPDF
+);
+
+router.post(
+  "/youtube",
+  authMiddleware,
+  uploadYoutube
 );
 
 router.get("/", authMiddleware, getUserPDFs);

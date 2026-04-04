@@ -8,6 +8,10 @@ export const uploadPDF = (file) => {
   return API.post("/pdf/upload", formData);
 };
 
+export const uploadYouTubeLink = (url) => {
+  return API.post("/pdf/youtube", { url });
+};
+
 export const getUserPDFs = () => {
   return API.get("/pdf");
 };

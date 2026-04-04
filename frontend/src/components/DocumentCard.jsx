@@ -24,7 +24,7 @@ export default function DocumentCard({ doc, onOpenDocument, onDelete }) {
         onClick={() => onOpenDocument(doc._id)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className="group relative rounded-2xl p-5 cursor-pointer flex flex-col justify-between h-auto overflow-hidden"
+        className="group relative rounded-2xl p-5 cursor-pointer flex flex-col justify-between h-44 overflow-hidden"
         style={{
           background: 'var(--bg-card)',
           border: `1px solid ${isHovered ? 'var(--accent)' : 'var(--border-color)'}`,

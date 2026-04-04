@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Send, Bot, User, Loader2, Sparkles,
   History, MessageSquare, Trash2, ShieldCheck, Plus, Search, AlertTriangle, X, PanelLeftOpen,
+  Mic, MicOff, Volume2, VolumeX,
 } from "lucide-react";
 import API from "../../services/apiClient";
 import ReactMarkdown from "react-markdown";
@@ -20,7 +21,74 @@ export default function ChatTab({ pdfId }) {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
+  const [isListening, setIsListening] = useState(false);
+  const [speakingIndex, setSpeakingIndex] = useState(null);
+  const recognitionRef = useRef(null);
   const scrollRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (recognitionRef.current) recognitionRef.current.stop();
+    };
+  }, []);
+
+  const toggleListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Speech recognition is not supported in your browser.");
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      recognitionRef.current?.stop();
+    } else {
+      setIsListening(true);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      
+      let finalTranscript = input;
+
+      recognition.onresult = (event) => {
+        let interimTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += (finalTranscript ? " " : "") + event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        setInput(finalTranscript + (interimTranscript ? " " + interimTranscript : ""));
+      };
+
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
+      
+      recognitionRef.current = recognition;
+      recognition.start();
+    }
+  };
+
+  const speakText = (text, index) => {
+    if (!window.speechSynthesis) {
+        toast.error("Text-to-Speech is not supported in your browser.");
+        return;
+    }
+    window.speechSynthesis.cancel();
+    if (speakingIndex === index) {
+      setSpeakingIndex(null);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Cleanup markdown chars for better speech
+    let cleanText = text.replace(/[#*`_~]/g, '');
+    utterance.text = cleanText;
+    utterance.onend = () => setSpeakingIndex(null);
+    setSpeakingIndex(index);
+    window.speechSynthesis.speak(utterance);
+  };
 
   const groupSessions = (historyList) => {
     const map = new Map();
@@ -438,6 +506,16 @@ export default function ChatTab({ pdfId }) {
                   >
                     {msg.text}
                   </ReactMarkdown>
+                  {msg.role === "ai" && (
+                    <button
+                      onClick={() => speakText(msg.text, i)}
+                      className="mt-3 text-[11px] sm:text-xs flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity font-bold w-fit"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      {speakingIndex === i ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                      {speakingIndex === i ? "STOP" : "LISTEN"}
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -467,6 +545,18 @@ export default function ChatTab({ pdfId }) {
             className="max-w-4xl mx-auto flex items-center gap-2 rounded-2xl p-1.5 transition-all shadow-sm"
             style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)' }}
           >
+            <button
+              type="button"
+              onClick={toggleListening}
+              className="p-2 sm:p-2.5 rounded-xl shrink-0 transition-colors"
+              title="Use Microphone"
+              style={{
+                color: isListening ? '#ef4444' : 'var(--text-muted)',
+                background: isListening ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+              }}
+            >
+              {isListening ? <MicOff size={18} className="animate-pulse" /> : <Mic size={18} />}
+            </button>
             <input
               type="text" value={input} onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about this document..."

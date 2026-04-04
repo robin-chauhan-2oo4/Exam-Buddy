@@ -1,11 +1,13 @@
 import { useState, useRef } from "react";
 import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { UploadCloud, File, X, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
+import { UploadCloud, File, X, Loader2, AlertCircle, ShieldCheck, Youtube, Link as LinkIcon } from "lucide-react";
 import { toast } from "react-toastify";
-import { uploadPDF } from "../services/pdf.api.js";
+import { uploadPDF, uploadYouTubeLink } from "../services/pdf.api.js";
 
 export default function UploadDocumentModal({ open, onClose, onSuccess }) {
+  const [mode, setMode] = useState("pdf");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -24,31 +26,51 @@ export default function UploadDocumentModal({ open, onClose, onSuccess }) {
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      setError("Please select a PDF file first.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-      await uploadPDF(file);
-
-      toast.success("Document analyzed successfully!");
-      onSuccess();
-      handleClose();
-    } catch (err) {
-      console.error(err);
-      setError("Upload failed. Please try again.");
-      toast.error("Failed to upload document.");
-    } finally {
-      setLoading(false);
+    if (mode === "pdf") {
+      if (!file) {
+        setError("Please select a PDF file first.");
+        return;
+      }
+      try {
+        setLoading(true);
+        setError("");
+        await uploadPDF(file);
+        toast.success("Document analyzed successfully!");
+        onSuccess();
+        handleClose();
+      } catch (err) {
+        console.error(err);
+        setError("Upload failed. Please try again.");
+        toast.error("Failed to upload document.");
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      if (!youtubeUrl.trim() || (!youtubeUrl.includes("youtube.com") && !youtubeUrl.includes("youtu.be"))) {
+        setError("Please enter a valid YouTube link.");
+        return;
+      }
+      try {
+        setLoading(true);
+        setError("");
+        await uploadYouTubeLink(youtubeUrl);
+        toast.success("YouTube video processed successfully!");
+        onSuccess();
+        handleClose();
+      } catch (err) {
+        console.error(err);
+        setError(err.response?.data?.message || "Failed to process video. Make sure English subtitles are available.");
+        toast.error("Failed to process YouTube video.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
   const handleClose = () => {
     if (loading) return;
     setFile(null);
+    setYoutubeUrl("");
     setError("");
     onClose();
   };
@@ -96,8 +118,29 @@ export default function UploadDocumentModal({ open, onClose, onSuccess }) {
 
         {/* Body */}
         <div className="p-8 space-y-6">
-          {/* Drop Area */}
-          {!file ? (
+          {/* Tabs */}
+          <div className="flex bg-[var(--bg-input)] p-1 rounded-xl" style={{ border: '1px solid var(--border-color)' }}>
+            <button
+              onClick={() => { setMode("pdf"); setError(""); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${
+                mode === "pdf" ? "bg-[var(--bg-card)] shadow-md text-[var(--accent)]" : "text-[var(--text-muted)]"
+              }`}
+            >
+              <File size={16} /> PDF
+            </button>
+            <button
+              onClick={() => { setMode("youtube"); setError(""); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${
+                mode === "youtube" ? "bg-[var(--bg-card)] shadow-md text-[#ef4444]" : "text-[var(--text-muted)]"
+              }`}
+            >
+              <Youtube size={16} /> YouTube
+            </button>
+          </div>
+
+          {mode === "pdf" ? (
+            /* PDF Drop Area */
+            !file ? (
             <motion.div
               whileHover={{ scale: 1.01 }}
               onClick={() => fileInputRef.current.click()}
@@ -156,6 +199,34 @@ export default function UploadDocumentModal({ open, onClose, onSuccess }) {
                 <X size={18} />
               </button>
             </motion.div>
+          ) ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col gap-3"
+            >
+              <label className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>YouTube Link</label>
+              <div
+                className="flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)' }}
+              >
+                <LinkIcon size={18} style={{ color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={youtubeUrl}
+                  onChange={(e) => {
+                    setYoutubeUrl(e.target.value);
+                    if (error) setError("");
+                  }}
+                  className="flex-1 bg-transparent border-none outline-none text-sm font-medium"
+                  style={{ color: 'var(--text-primary)' }}
+                />
+              </div>
+              <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                Please provide a public YouTube video that has English closed captions enabled.
+              </p>
+            </motion.div>
           )}
 
           {/* Error Message */}
@@ -198,30 +269,30 @@ export default function UploadDocumentModal({ open, onClose, onSuccess }) {
           </button>
 
           <motion.button
-            whileHover={{ scale: !file || loading ? 1 : 1.02 }}
-            whileTap={{ scale: !file || loading ? 1 : 0.98 }}
+            whileHover={{ scale: (!file && mode === "pdf") || loading ? 1 : 1.02 }}
+            whileTap={{ scale: (!file && mode === "pdf") || loading ? 1 : 0.98 }}
             onClick={handleUpload}
-            disabled={!file || loading}
+            disabled={((!file && mode === "pdf") || (!youtubeUrl && mode === "youtube")) || loading}
             className={`flex items-center gap-2 px-8 py-2.5 rounded-xl font-bold transition-all shadow-lg ${
-              !file || loading
+              ((!file && mode === "pdf") || (!youtubeUrl && mode === "youtube")) || loading
                 ? "cursor-not-allowed opacity-60 shadow-none"
                 : ""
             }`}
             style={{
-              background: !file || loading
+              background: ((!file && mode === "pdf") || (!youtubeUrl && mode === "youtube")) || loading
                 ? 'var(--bg-input)'
                 : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              color: !file || loading ? 'var(--text-muted)' : '#fff',
-              boxShadow: !file || loading ? 'none' : '0 4px 15px var(--accent-shadow)',
+              color: ((!file && mode === "pdf") || (!youtubeUrl && mode === "youtube")) || loading ? 'var(--text-muted)' : '#fff',
+              boxShadow: ((!file && mode === "pdf") || (!youtubeUrl && mode === "youtube")) || loading ? 'none' : '0 4px 15px var(--accent-shadow)',
             }}
           >
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                <span>Analyzing PDF...</span>
+                <span>Processing...</span>
               </>
             ) : (
-              <span>Upload & Analyze</span>
+              <span>{mode === "pdf" ? "Upload & Analyze" : "Import & Analyze"}</span>
             )}
           </motion.button>
         </div>

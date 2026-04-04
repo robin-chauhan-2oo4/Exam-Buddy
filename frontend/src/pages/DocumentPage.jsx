@@ -8,6 +8,7 @@ import {
   Calendar,
   Loader2,
   MessageSquare,
+  Youtube,
 } from "lucide-react";
 
 import Layout from "../components/Layout";
@@ -101,9 +102,12 @@ export default function DocumentPage() {
 
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-xl hidden sm:flex items-center justify-center shrink-0"
-                style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}
+                style={{ 
+                  background: document.extractedText?.startsWith("Video Title:") ? 'rgba(239, 68, 68, 0.1)' : 'var(--accent-light)', 
+                  color: document.extractedText?.startsWith("Video Title:") ? '#ef4444' : 'var(--accent)' 
+                }}
               >
-                <FileText size={32} />
+                {document.extractedText?.startsWith("Video Title:") ? <Youtube size={32} /> : <FileText size={32} />}
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight leading-tight break-words"
@@ -111,14 +115,24 @@ export default function DocumentPage() {
                 >
                   {document.originalName || document.filename}
                 </h1>
-                <div className="flex flex-wrap items-center gap-2 text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar size={14} />
-                    <span>Uploaded on {new Date(document.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <span className="hidden sm:inline">•</span>
-                  <span>{Math.max(1, Math.round((document.extractedText?.length || 0) / 3000))} min read</span>
-                </div>
+                {(() => {
+                  const isYoutube = document.extractedText?.startsWith("Video Title:");
+                  const wordCount = (document.extractedText || "").split(/\s+/).filter(Boolean).length;
+                  return (
+                    <div className="flex flex-wrap items-center gap-2 text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
+                      <div className="flex items-center gap-1.5">
+                        <Calendar size={14} />
+                        <span>Uploaded on {new Date(document.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <span className="hidden sm:inline">•</span>
+                      {isYoutube ? (
+                        <span>{wordCount.toLocaleString()} words transcribed</span>
+                      ) : (
+                        <span>{Math.max(1, Math.round((document.extractedText?.length || 0) / 3000))} min read</span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>

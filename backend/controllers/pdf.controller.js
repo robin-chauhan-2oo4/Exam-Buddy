@@ -1,6 +1,7 @@
 import fs from "fs";
 import PDF from "../models/PDF.js";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { YoutubeTranscript } from "youtube-transcript/dist/youtube-transcript.esm.js";
 
 export const uploadPDF = async (req, res) => {
   try {
@@ -46,6 +47,83 @@ export const uploadPDF = async (req, res) => {
   }
 };
 
+export const uploadYoutube = async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({
+        message: "No URL provided",
+      });
+    }
+
+    // 1. Extract video ID
+    let videoId = url;
+    try {
+      const urlObj = new URL(url);
+      videoId = urlObj.searchParams.get("v") || urlObj.pathname.split("/").pop() || url;
+    } catch (e) {}
+
+    // 2. Fetch the actual video title from YouTube's page
+    let videoTitle = videoId;
+    try {
+      const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      });
+      const html = await pageRes.text();
+      // Try og:title meta tag first (most reliable)
+      const ogMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/);
+      if (ogMatch && ogMatch[1]) {
+        videoTitle = ogMatch[1];
+      } else {
+        // Fallback to <title> tag
+        const titleMatch = html.match(/<title>([^<]+)<\/title>/);
+        if (titleMatch && titleMatch[1]) {
+          videoTitle = titleMatch[1].replace(/ - YouTube$/, "").trim();
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch video title, using video ID:", e.message);
+    }
+
+    // 3. Fetch transcript
+    const transcript = await YoutubeTranscript.fetchTranscript(url);
+
+    if (!transcript || transcript.length === 0) {
+      return res.status(400).json({
+        message: "No closed captions found for this video.",
+      });
+    }
+
+    // 4. Build rich extracted text with proper structure
+    const transcriptLines = transcript.map((t) => t.text.trim()).filter(Boolean);
+    const extractedText = [
+      `Video Title: ${videoTitle}`,
+      `Source: ${url}`,
+      `---`,
+      `Transcript:`,
+      ``,
+      ...transcriptLines,
+    ].join("\n");
+
+    const pdfDoc = await PDF.create({
+      user: req.user.id,
+      filename: videoTitle,
+      extractedText,
+    });
+
+    res.status(201).json({
+      message: "YouTube video processed",
+      pdfId: pdfDoc._id,
+    });
+  } catch (error) {
+    console.error("YouTube upload error:", error);
+    res.status(500).json({
+      message: "Failed to process YouTube video. Check if subtitles/captions are available.",
+    });
+  }
+};
 
 
 export const getUserPDFs = async (req, res) => {
